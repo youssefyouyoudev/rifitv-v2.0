@@ -1,0 +1,14 @@
+[Unit]
+Description=RiFiTV Laravel scheduler
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/rifitv-v2.0/backend
+ExecStart=/usr/bin/php artisan schedule:work
+Restart=always
+RestartSec=5
+User=www-data
+
+[Install]
+WantedBy=multi-user.target

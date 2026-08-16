@@ -1,0 +1,24 @@
+{
+  "retrieved_at": "2026-08-14T16:04:12Z",
+  "verified_at": "2026-08-14T16:04:12Z",
+  "version": "2026-27-rifitv-production-v1",
+  "sources": {
+    "premier-league": "https://www.premierleague.com/en/news/4675097/all-380-fixtures-for-202627-premier-league-season",
+    "laliga-ea-sports": "https://www.laliga.com/en-GB/laliga-easports/calendar",
+    "laliga-json": "https://assets.laliga.com/assets/calendar/calendar-102-1.json",
+    "ligue-1-psg": "https://www.psg.fr/en/mens-football/fixtures",
+    "ligue-1-psg-api": "https://api.psg.fr/umbraco/delivery/api/v2/content?take=80&filter=contentType:matchSheet&filter=matchSeason:2026-2027&filter=matchTeam:2b3mar72yy8d6uvat1ka6tn3r&filter=matchCompetition:dm5ka0os1e3dxcp3vh05kmp33&sort=matchDate:asc"
+  },
+  "premier-league-rifitv.json": {
+    "checksum": "2e8e4e6dcb25d484ec8d561d055dbaeb0c282d007e10c228be5fe467f4ca6071",
+    "records": 198
+  },
+  "laliga-rifitv.json": {
+    "checksum": "024650d89eeb4c902484eca26f4457179a4ff31eb92c4cfc9c576b728bcf85b2",
+    "records": 108
+  },
+  "ligue1-psg.json": {
+    "checksum": "5a33f1fb0807ae698cbeb5d0d6e04e9ef33be8e52679367b3dcd247a7aab33f8",
+    "records": 34
+  }
+}

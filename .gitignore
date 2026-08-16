@@ -1,0 +1,16 @@
+backend/.env
+backend/vendor/
+backend/node_modules/
+backend/storage/*.key
+backend/storage/pail/
+backend/.phpunit.cache/
+backend/.phpunit.result.cache
+frontend/.env*
+!frontend/.env.example
+frontend/node_modules/
+frontend/.next/
+frontend/test-results/
+frontend/playwright-report/
+*.log
+.DS_Store
+Thumbs.db

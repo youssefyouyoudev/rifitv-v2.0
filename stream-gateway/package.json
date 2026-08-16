@@ -1,0 +1,17 @@
+{
+  "name": "rifitv-stream-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "tsc --noEmit",
+    "test": "node --test",
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^20.19.24",
+    "typescript": "^5.9.2"
+  }
+}
+

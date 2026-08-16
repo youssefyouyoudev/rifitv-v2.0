@@ -1,0 +1,15 @@
+[Unit]
+Description=RiFiTV Next.js frontend
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/rifitv-v2.0/frontend
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/npm run start -- --hostname 127.0.0.1 --port 3000
+Restart=always
+RestartSec=5
+User=www-data
+
+[Install]
+WantedBy=multi-user.target

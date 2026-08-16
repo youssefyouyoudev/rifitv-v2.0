@@ -1,0 +1,14 @@
+[Unit]
+Description=RiFiTV Laravel queue worker
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/rifitv-v2.0/backend
+ExecStart=/usr/bin/php artisan queue:work redis --sleep=2 --tries=3 --timeout=90
+Restart=always
+RestartSec=5
+User=www-data
+
+[Install]
+WantedBy=multi-user.target
