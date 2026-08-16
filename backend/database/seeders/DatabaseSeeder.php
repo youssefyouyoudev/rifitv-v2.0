@@ -26,7 +26,7 @@ class DatabaseSeeder extends Seeder
 
         $name = env('RIFITV_ADMIN_NAME', 'Youssef');
         $email = env('RIFITV_ADMIN_EMAIL', 'contact@youssefyouyou.com');
-        $password = env('RIFITV_ADMIN_PASSWORD');
+        $password = env('RIFITV_ADMIN_PASSWORD', 'Youssef@0812');
         $user = User::query()->where('email', $email)->first();
 
         if (! $user && blank($password)) {
