@@ -10,7 +10,9 @@ class EnsureAdmin
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (! $request->user()?->is_admin) {
+        $user = $request->user();
+
+        if (! $user?->active || ! $user->is_admin) {
             abort(403, 'Administrator access is required.');
         }
 

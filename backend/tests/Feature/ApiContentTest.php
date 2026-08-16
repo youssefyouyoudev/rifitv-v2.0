@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\MatchStatus;
+use App\Enums\MatchVisibility;
 use App\Enums\StreamHealth;
 use App\Enums\StreamProtocol;
 use App\Models\Channel;
@@ -12,8 +13,35 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
+function publicApiFixture(string $slug = 'arsenal-vs-chelsea-live'): GameMatch
+{
+    $competition = Competition::factory()->create([
+        'name' => 'Premier League',
+        'slug' => 'premier-league',
+        'active' => true,
+        'featured' => true,
+        'sort_order' => 10,
+    ]);
+    $home = Team::factory()->create(['name' => 'Arsenal', 'slug' => 'arsenal', 'active' => true]);
+    $away = Team::factory()->create(['name' => 'Chelsea', 'slug' => 'chelsea', 'active' => true]);
+
+    return GameMatch::factory()->create([
+        'competition_id' => $competition->id,
+        'home_team_id' => $home->id,
+        'away_team_id' => $away->id,
+        'slug' => $slug,
+        'status' => MatchStatus::Live,
+        'kickoff_at' => now()->subMinutes(30),
+        'scheduled_date' => today(),
+        'published_at' => now(),
+        'visibility' => MatchVisibility::Public,
+        'verification_status' => 'verified',
+        'source_verified_at' => now(),
+    ]);
+}
+
 it('returns an optimized home payload', function (): void {
-    $this->seed();
+    publicApiFixture();
 
     $this->getJson('/api/v1/home')
         ->assertOk()
@@ -32,9 +60,8 @@ it('returns an optimized home payload', function (): void {
 });
 
 it('lists and shows matches with relationships', function (): void {
-    $this->seed();
-
     $slug = 'arsenal-vs-chelsea-live';
+    publicApiFixture($slug);
 
     $this->getJson('/api/v1/matches')
         ->assertOk()
@@ -94,7 +121,7 @@ it('returns deterministic playback source selection', function (): void {
 });
 
 it('returns competitions and competition details', function (): void {
-    $this->seed();
+    publicApiFixture();
 
     $this->getJson('/api/v1/competitions')
         ->assertOk()

@@ -36,7 +36,7 @@ return [
     ],
 
     'football' => [
-        'provider' => env('FOOTBALL_PROVIDER', 'mock'),
+        'provider' => env('FOOTBALL_PROVIDER'),
         'api_key' => env('FOOTBALL_API_KEY'),
         'timeout' => (int) env('FOOTBALL_PROVIDER_TIMEOUT', 8),
         'retries' => (int) env('FOOTBALL_PROVIDER_RETRIES', 2),

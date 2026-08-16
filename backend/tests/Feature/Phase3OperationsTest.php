@@ -24,6 +24,10 @@ use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
 
+beforeEach(function (): void {
+    config(['services.football.provider' => 'mock']);
+});
+
 function phase3OwnerUser(): User
 {
     $role = Role::query()->create(['name' => 'Owner', 'slug' => 'owner', 'permissions' => ['*']]);

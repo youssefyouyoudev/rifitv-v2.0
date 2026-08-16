@@ -187,11 +187,24 @@ class OfficialFixtureImportService
 
         return collect($files)
             ->map(function (string $slug, string $file) use ($root): array {
-                $payload = json_decode(file_get_contents("{$root}/{$file}"), true, flags: JSON_THROW_ON_ERROR);
+                $path = "{$root}/{$file}";
+                $payload = json_decode(file_get_contents($path), true, flags: JSON_THROW_ON_ERROR);
+                $manifest = json_decode(file_get_contents("{$root}/sources.json"), true, flags: JSON_THROW_ON_ERROR);
+                $sourceIsVerified = hash_file('sha256', $path) === ($manifest[$file]['checksum'] ?? null)
+                    && count($payload['fixtures'] ?? []) === ($manifest[$file]['records'] ?? null);
                 $competition = $this->competitions[$slug];
                 $competition['slug'] = $slug;
                 $competition['source_url'] = (string) ($payload['source'] ?? data_get($payload, 'fixtures.0.source_reference', ''));
 
+                $payload['fixtures'] = collect($payload['fixtures'] ?? [])
+                    ->map(function (array $fixture) use ($manifest, $sourceIsVerified): array {
+                        if ($sourceIsVerified) {
+                            $fixture['source_verified_at'] = $manifest['verified_at'] ?? $manifest['retrieved_at'] ?? null;
+                        }
+
+                        return $fixture;
+                    })
+                    ->all();
                 $payload['competition'] = $competition;
 
                 return $payload;
@@ -276,6 +289,8 @@ class OfficialFixtureImportService
         $precision = $this->kickoffPrecision((string) ($fixture['kickoff_status'] ?? 'tbc'));
         $kickoffAt = null;
         $kickoffLocal = $fixture['kickoff_local'] ?? null;
+        $verified = filled($fixture['source_verified_at'] ?? null) && ! $this->isRejectedStaleFixture($competition->slug, $home->name, $away->name, (string) $fixture['scheduled_date']);
+        $sourceVerifiedAt = $verified ? Carbon::parse((string) $fixture['source_verified_at']) : null;
 
         if ($precision === 'confirmed' && filled($kickoffLocal)) {
             $kickoffAt = Carbon::createFromFormat(
@@ -303,16 +318,16 @@ class OfficialFixtureImportService
             'source_matchday' => $fixture['matchday'] ?? null,
             'source_round_label' => $fixture['round_label'] ?? null,
             'source_reference' => $fixture['source_reference'] ?? null,
-            'source_verified_at' => null,
+            'source_verified_at' => $sourceVerifiedAt,
             'source_hash' => $this->productionAudit->sourceHash($fixture),
-            'verification_status' => 'pending_verification',
+            'verification_status' => $verified ? 'verified' : 'pending_verification',
             'status' => MatchStatus::Scheduled,
             'home_score' => null,
             'away_score' => null,
             'minute' => null,
             'featured' => $featured,
-            'published_at' => $featured ? now() : null,
-            'visibility' => $featured ? MatchVisibility::Public : MatchVisibility::Internal,
+            'published_at' => $featured && $verified ? now() : null,
+            'visibility' => $featured && $verified ? MatchVisibility::Public : MatchVisibility::Internal,
             'seo_title' => "{$home->name} vs {$away->name} - {$competition->name}",
             'seo_description' => "{$home->name} vs {$away->name} {$competition->name} fixture information on RiFiTV.",
             'slug' => Str::slug(Str::ascii("{$home->name} vs {$away->name} {$competition->slug} {$season->slug} {$fixture['external_id']}")),
@@ -382,6 +397,18 @@ class OfficialFixtureImportService
     private function slug(string $value): string
     {
         return Str::slug(Str::ascii($value));
+    }
+
+    private function isRejectedStaleFixture(string $competitionSlug, string $home, string $away, string $date): bool
+    {
+        return collect([
+            ['competition' => 'laliga-ea-sports', 'home' => 'Atletico de Madrid', 'away' => 'Malaga CF', 'date' => '2026-08-16'],
+            ['competition' => 'laliga-ea-sports', 'home' => 'FC Barcelona', 'away' => 'Athletic Club', 'date' => '2026-08-16'],
+            ['competition' => 'laliga-ea-sports', 'home' => 'Real Madrid', 'away' => 'Real Sociedad', 'date' => '2026-08-16'],
+        ])->contains(fn (array $fixture): bool => $fixture['competition'] === $competitionSlug
+            && $this->slug($fixture['home']) === $this->slug($home)
+            && $this->slug($fixture['away']) === $this->slug($away)
+            && $fixture['date'] === $date);
     }
 
     private function localAssetExists(?string $path): bool

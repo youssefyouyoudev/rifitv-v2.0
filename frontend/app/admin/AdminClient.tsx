@@ -155,9 +155,9 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
   const pathname = usePathname();
   const router = useRouter();
   const currentRoute = useMemo(() => parseAdminSection(pathname.replace(/^\/admin\/?/, "") || "dashboard"), [pathname]);
-  const [email, setEmail] = useState("admin@rifitv.local");
-  const [password, setPassword] = useState("password");
-  const [authStatus, setAuthStatus] = useState<"checking" | "guest" | "authenticated">("checking");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authStatus, setAuthStatus] = useState<"checking" | "guest" | "authenticated" | "forbidden">("checking");
   const [activeOverride, setActiveOverride] = useState<string | null>(null);
   const [controlMatchId, setControlMatchId] = useState<number | null>(initialRoute.matchId);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -197,7 +197,6 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
         await adminGet<ApiOne<unknown>>("/auth/user");
         if (!mounted) return;
         setAuthStatus("authenticated");
-        await loadAll();
       } catch (caught) {
         if (!mounted) return;
         if (caught instanceof ApiError && caught.status === 401) {
@@ -217,6 +216,25 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
     // Bootstrap intentionally runs once; route changes reuse the same session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (authStatus !== "authenticated") {
+      return;
+    }
+
+    let mounted = true;
+
+    loadAll().catch((caught) => {
+      if (!mounted) return;
+      handleApiFailure(caught);
+    });
+
+    return () => {
+      mounted = false;
+    };
+    // loadAll intentionally uses current session state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authStatus]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -268,10 +286,10 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
     try {
       await csrfCookie();
       await adminSend("/auth/login", "POST", { email, password });
+      await adminGet<ApiOne<unknown>>("/auth/user");
       setAuthStatus("authenticated");
-      await loadAll();
-    } catch {
-      setError("Admin login failed. Check the email and password.");
+    } catch (caught) {
+      setError(apiErrorMessage(caught));
     }
   }
 
@@ -302,15 +320,35 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
       if (caught instanceof ApiError && caught.status === 401) {
         setAuthStatus("guest");
       }
+      if (caught instanceof ApiError && caught.status === 403) {
+        setAuthStatus("forbidden");
+      }
       throw caught;
     }
   }
 
   async function adminUpload<T>(path: string, body: FormData): Promise<T> {
-    return apiFetch<T>(path, {
-      method: "POST",
-      body,
-    });
+    try {
+      return await apiFetch<T>(path, {
+        method: "POST",
+        body,
+      });
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 419) {
+        await csrfCookie();
+        return await apiFetch<T>(path, {
+          method: "POST",
+          body,
+        });
+      }
+      if (caught instanceof ApiError && caught.status === 401) {
+        setAuthStatus("guest");
+      }
+      if (caught instanceof ApiError && caught.status === 403) {
+        setAuthStatus("forbidden");
+      }
+      throw caught;
+    }
   }
 
   async function loadAll() {
@@ -321,7 +359,7 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
       adminGet<ApiList<Entity>>("/admin/competitions?per_page=100"),
       adminGet<ApiList<Entity>>("/admin/channels?per_page=100"),
       adminGet<ApiList<Entity>>("/admin/stream-sources?per_page=100"),
-      adminGet<ApiList<Playlist>>("/admin/playlists?per_page=100").catch(() => ({ data: [] })),
+      adminGet<ApiList<Playlist>>("/admin/playlists?per_page=100"),
       adminGet<ApiList<Entity>>("/admin/audit-logs?per_page=30"),
       adminGet<ApiOne<TodayOps>>("/admin/today"),
       adminGet<ApiList<Entity>>("/admin/stream-health?per_page=100"),
@@ -353,6 +391,18 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
     setMatchControl(payload.data);
   }
 
+  function handleApiFailure(caught: unknown) {
+    const message = apiErrorMessage(caught);
+
+    setError(message);
+    if (caught instanceof ApiError && caught.status === 401) {
+      setAuthStatus("guest");
+    }
+    if (caught instanceof ApiError && caught.status === 403) {
+      setAuthStatus("forbidden");
+    }
+  }
+
   async function run(action: () => Promise<void>, success: string) {
     try {
       setError(null);
@@ -360,7 +410,7 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
       setNotice(success);
       await loadAll();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Something went wrong.");
+      handleApiFailure(caught);
     }
   }
 
@@ -380,11 +430,30 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
               <p className="text-sm text-[var(--muted)]">Manage RiFiTV without SSH or database edits.</p>
             </div>
           </div>
-          <Input label="Email" value={email} onChange={setEmail} />
-          <Input label="Password" type="password" value={password} onChange={setPassword} />
+          <Input label="Email" type="email" autoComplete="username" value={email} onChange={setEmail} />
+          <Input label="Password" type="password" autoComplete="current-password" value={password} onChange={setPassword} />
           {error ? <p className="mb-3 text-sm text-red-300">{error}</p> : null}
           <button className="h-11 rounded-md bg-[var(--brand-blue)] px-4 font-semibold text-white outline-none hover:brightness-110 focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]" onClick={() => void login()}>
             Sign in
+          </button>
+        </section>
+      </div>
+    );
+  }
+
+  if (authStatus === "forbidden") {
+    return (
+      <div className="grid min-h-screen place-items-center bg-[var(--background)] p-4 text-[var(--foreground)]">
+        <section className="w-full max-w-md rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6">
+          <div className="mb-5 flex items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-md bg-[var(--surface-muted)] text-red-300"><Shield className="h-5 w-5" /></div>
+            <div>
+              <h1 className="text-lg font-semibold text-[var(--foreground)]">Admin Access Required</h1>
+              <p className="text-sm text-[var(--muted)]">{error ?? "Your account is signed in but is not allowed to manage RiFiTV."}</p>
+            </div>
+          </div>
+          <button className="h-11 rounded-md border border-[var(--border)] px-4 font-semibold text-[var(--foreground)]" onClick={() => void logout()}>
+            Sign out
           </button>
         </section>
       </div>
@@ -1069,7 +1138,7 @@ function AuditLog({ items }: { items: Entity[] }) {
 type ManagerProps = { run: (action: () => Promise<void>, success: string) => Promise<void>; adminSend: <T>(path: string, method: string, body?: unknown) => Promise<T> };
 function Panel({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) { return <section className="rounded-lg border border-white/10 bg-neutral-900 p-4"><div className="mb-4 flex items-center justify-between gap-3"><h2 className="font-semibold text-white">{title}</h2>{action}</div><div className="space-y-3">{children}</div></section>; }
 function Stat({ label, value }: { label: string; value: number }) { return <div className="rounded-lg border border-white/10 bg-neutral-900 p-4"><span className="text-sm capitalize text-neutral-400">{label}</span><strong className="mt-2 block text-2xl text-white">{value}</strong></div>; }
-function Input({ label, value, onChange, type = "text", autoFocus = false }: { label: string; value: string; onChange: (value: string) => void; type?: string; autoFocus?: boolean }) { return <label className="block text-sm font-medium text-neutral-300">{label}<input autoFocus={autoFocus} type={type} className="mt-1 h-11 w-full rounded-md border border-white/10 bg-black px-3 text-white outline-none focus-visible:ring-2 focus-visible:ring-red-300" value={value} onChange={(event) => onChange(event.target.value)} /></label>; }
+function Input({ label, value, onChange, type = "text", autoFocus = false, autoComplete }: { label: string; value: string; onChange: (value: string) => void; type?: string; autoFocus?: boolean; autoComplete?: string }) { return <label className="block text-sm font-medium text-neutral-300">{label}<input autoFocus={autoFocus} autoComplete={autoComplete} type={type} className="mt-1 h-11 w-full rounded-md border border-white/10 bg-black px-3 text-white outline-none focus-visible:ring-2 focus-visible:ring-red-300" value={value} onChange={(event) => onChange(event.target.value)} /></label>; }
 function Select({ label, value, options, onChange }: { label: string; value: string; options: Entity[]; onChange: (value: string) => void }) { return <label className="block text-sm font-medium text-neutral-300">{label}<select className="mt-1 h-11 w-full rounded-md border border-white/10 bg-black px-3 text-white outline-none focus-visible:ring-2 focus-visible:ring-red-300" value={value} onChange={(event) => onChange(event.target.value)}><option value="">Choose...</option>{options.map((option) => <option key={option.id} value={option.id}>{String(option.name ?? option.title ?? option.slug ?? option.id)}</option>)}</select></label>; }
 function SelectRaw({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) { return <label className="block text-sm font-medium text-neutral-300">{label}<select className="mt-1 h-11 w-full rounded-md border border-white/10 bg-black px-3 text-white" value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>; }
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) { return <label className="flex h-11 items-center justify-between rounded-md border border-white/10 bg-black/30 px-3 text-sm text-neutral-300">{label}<input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} /></label>; }
@@ -1084,6 +1153,35 @@ function Toast({ tone, message, onClose }: { tone: "success" | "error"; message:
 function groupBy<T extends Record<string, unknown>>(items: T[], key: keyof T): Record<string, T[]> { return items.reduce((groups, item) => { const value = String(item[key]); groups[value] ??= []; groups[value].push(item); return groups; }, {} as Record<string, T[]>); }
 function labelize(value: string): string { return value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()); }
 function localDateTime(): string { const date = new Date(Date.now() + 60 * 60 * 1000); date.setMinutes(0, 0, 0); return date.toISOString().slice(0, 16); }
+function apiErrorMessage(caught: unknown): string {
+  if (!(caught instanceof ApiError)) {
+    return caught instanceof Error ? caught.message : "Something went wrong.";
+  }
+
+  const firstValidationMessage = validationMessage(caught.payload);
+  if (firstValidationMessage) {
+    return firstValidationMessage;
+  }
+
+  if (caught.status === 401) return "Please sign in to continue.";
+  if (caught.status === 403) return caught.message || "Your account is not allowed to access this admin area.";
+  if (caught.status === 419) return "Your secure session expired. Please try again.";
+  if (caught.status === 422) return caught.message || "Please check the form and try again.";
+  if (caught.status === 429) return caught.message || "Too many attempts. Please wait and try again.";
+  if (caught.status >= 500) return "RiFiTV is having trouble completing that request. Please try again shortly.";
+
+  return caught.message;
+}
+function validationMessage(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object" || !("errors" in payload)) {
+    return null;
+  }
+
+  const errors = (payload as { errors?: Record<string, unknown> }).errors;
+  const first = errors ? Object.values(errors)[0] : null;
+
+  return Array.isArray(first) && first.length > 0 ? String(first[0]) : null;
+}
 function parseAdminSection(value: string): { active: string; matchId: number | null } {
   const parts = value.split("/").filter(Boolean);
   if (parts[0] === "matches" && parts[2] === "control" && Number(parts[1])) {

@@ -369,6 +369,12 @@ Artisan::command('rifitv:create-owner {--name=} {--email=} {--password=}', funct
 
 Artisan::command('rifitv:production-check', function (FootballProductionAuditService $footballAudit) {
     $football = $footballAudit->report('2026-27');
+    $corsOrigins = collect(config('cors.allowed_origins', []))
+        ->map(fn (string $origin): string => rtrim($origin, '/'))
+        ->filter()
+        ->values();
+    $expectedCorsOrigins = collect(['https://rifitv.com', 'https://www.rifitv.com']);
+    $footballProvider = config('services.football.provider');
     $checks = [
         'APP_ENV is production' => app()->environment('production'),
         'APP_DEBUG is false' => ! (bool) config('app.debug'),
@@ -378,8 +384,8 @@ Artisan::command('rifitv:production-check', function (FootballProductionAuditSer
         'queue is not sync' => config('queue.default') !== 'sync',
         'storage writable' => is_writable(storage_path()) && rescue(fn () => Storage::disk('local')->put('health/.probe', 'ok'), false, report: false) !== false,
         'frontend URL configured' => filled(config('app.frontend_url')),
-        'CORS origins configured' => filled(env('CORS_ALLOWED_ORIGINS')),
-        'football provider configured' => filled(config('services.football.provider')),
+        'CORS origins configured' => $expectedCorsOrigins->every(fn (string $origin): bool => $corsOrigins->contains($origin)),
+        'football provider disabled or non-production mock' => blank($footballProvider) || (! app()->environment('production') && $footballProvider === 'mock'),
         'football production audit passes' => $football['ok'],
     ];
 

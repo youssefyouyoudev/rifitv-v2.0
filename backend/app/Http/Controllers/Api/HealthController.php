@@ -29,7 +29,10 @@ class HealthController extends Controller
             'cache' => $this->status($this->cacheOk()),
             'queue' => $this->status(DB::table('failed_jobs')->count() === 0, ['pending_jobs' => DB::table('jobs')->count(), 'failed_jobs' => DB::table('failed_jobs')->count()]),
             'scheduler' => $this->status((bool) Cache::get('rifitv:scheduler:last_seen_at'), ['last_seen_at' => Cache::get('rifitv:scheduler:last_seen_at')]),
-            'football_provider' => $this->status((bool) config('services.football.provider'), ['provider' => config('services.football.provider')]),
+            'football_provider' => $this->status(true, [
+                'provider' => config('services.football.provider') ?: 'disabled',
+                'external_sync_enabled' => filled(config('services.football.provider')),
+            ]),
             'streams' => $this->status(OperationalAlert::query()->where('status', 'open')->where('type', 'stream_offline')->doesntExist(), ['last_check_at' => StreamHealthCheck::query()->latest('checked_at')->value('checked_at')]),
             'sync' => $this->status(SyncRun::query()->where('status', 'failed')->where('started_at', '>=', now()->subDay())->doesntExist()),
             'storage' => $this->status(Storage::disk('local')->exists('.') || is_writable(storage_path())),

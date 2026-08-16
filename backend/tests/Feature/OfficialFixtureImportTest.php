@@ -13,12 +13,13 @@ use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
-it('imports 2026-27 fixture snapshots as pending provenance data and blocks stale verification', function (): void {
+it('imports 2026-27 fixture snapshots as verified provenance data', function (): void {
     $this->artisan('rifitv:fixtures:import 2026-27')->assertExitCode(0);
-    $this->artisan('rifitv:fixtures:verify 2026-27')->assertExitCode(1);
+    $this->artisan('rifitv:fixtures:verify 2026-27')->assertExitCode(0);
 
     expect(GameMatch::query()->whereIn('provider', ['official-premier-league', 'official-laliga', 'official-psg'])->count())->toBe(340)
-        ->and(GameMatch::query()->where('verification_status', 'pending_verification')->count())->toBe(340)
+        ->and(GameMatch::query()->where('verification_status', 'verified')->count())->toBe(340)
+        ->and(GameMatch::query()->whereNull('source_verified_at')->exists())->toBeFalse()
         ->and(GameMatch::query()->whereNull('source_provider')->exists())->toBeFalse()
         ->and(GameMatch::query()->whereNull('source_external_id')->exists())->toBeFalse()
         ->and(GameMatch::query()->whereNull('source_reference')->exists())->toBeFalse()
@@ -28,9 +29,8 @@ it('imports 2026-27 fixture snapshots as pending provenance data and blocks stal
         ->and(GameMatch::query()->whereHas('competition', fn ($query) => $query->where('slug', 'uefa-champions-league'))->count())->toBe(0);
 
     $report = app(OfficialFixtureImportService::class)->verify('2026-27');
-    expect($report['ok'])->toBeFalse()
-        ->and(collect($report['failures'])->contains(fn (string $failure): bool => str_contains($failure, 'Atletico de Madrid') && str_contains($failure, '2026-08-19')))->toBeTrue()
-        ->and(collect($report['failures'])->contains(fn (string $failure): bool => str_contains($failure, 'Stale fixture still present')))->toBeTrue();
+    expect($report['ok'])->toBeTrue()
+        ->and($report['failures'])->toBeEmpty();
 
     foreach (['premier-league' => 198, 'laliga-ea-sports' => 108, 'ligue-1' => 34] as $competitionSlug => $expectedCount) {
         $season = Season::query()->whereHas('competition', fn ($query) => $query->where('slug', $competitionSlug))->firstOrFail();
@@ -73,7 +73,7 @@ it('imports only the RiFiTV club scope and seeds local logos', function (): void
         ->exists())->toBeFalse();
 });
 
-it('preserves fixture precision without fake kickoff times and rejects stale anchors', function (): void {
+it('preserves fixture precision without fake kickoff times and accepts corrected official anchors', function (): void {
     $this->artisan('rifitv:fixtures:import 2026-27')->assertExitCode(0);
 
     $arsenalCoventry = GameMatch::query()
@@ -91,28 +91,29 @@ it('preserves fixture precision without fake kickoff times and rejects stale anc
         ->whereHas('awayTeam', fn ($query) => $query->where('name', 'Málaga CF'))
         ->firstOrFail();
 
-    expect($atleticoMalaga->kickoff_precision)->toBe('provisional')
-        ->and($atleticoMalaga->kickoff_at)->toBeNull()
-        ->and($atleticoMalaga->scheduled_date?->toDateString())->toBe('2026-08-16');
+    expect($atleticoMalaga->kickoff_precision)->toBe('confirmed')
+        ->and($atleticoMalaga->kickoff_at?->toIso8601String())->toBe('2026-08-19T19:00:00+00:00')
+        ->and($atleticoMalaga->scheduled_date?->toDateString())->toBe('2026-08-19');
 
     $verification = app(OfficialFixtureImportService::class)->verify('2026-27');
     expect(GameMatch::query()->where('kickoff_precision', '!=', 'confirmed')->whereNotNull('kickoff_at')->exists())->toBeFalse()
-        ->and($verification['ok'])->toBeFalse()
-        ->and(collect($verification['stale_rejections'])->firstWhere('home', 'Atletico de Madrid')['ok'])->toBeFalse();
+        ->and($verification['ok'])->toBeTrue()
+        ->and(collect($verification['stale_rejections'])->firstWhere('home', 'Atletico de Madrid')['ok'])->toBeTrue();
 });
 
 it('keeps pending imported fixtures out of the public API until manual verification', function (): void {
     $this->artisan('rifitv:fixtures:import 2026-27')->assertExitCode(0);
 
-    $this->getJson('/api/v1/matches')->assertOk()->assertJsonCount(0, 'data');
-
     $match = GameMatch::query()->firstOrFail();
+    $match->forceFill(['verification_status' => 'pending_verification', 'source_verified_at' => null, 'published_at' => now()])->save();
+    $hiddenPayload = $this->getJson('/api/v1/matches?per_page=50')->assertOk()->json('data');
+    expect(collect($hiddenPayload)->pluck('id')->contains($match->id))->toBeFalse();
+
     $match->forceFill(['verification_status' => 'manual_verified', 'source_verified_at' => now()])->save();
 
-    $this->getJson('/api/v1/matches')
+    $this->getJson('/api/v1/matches?per_page=50')
         ->assertOk()
-        ->assertJsonCount(1, 'data')
-        ->assertJsonPath('data.0.verification_status', 'manual_verified');
+        ->assertJsonFragment(['verification_status' => 'manual_verified']);
 });
 
 it('supports team aliases for public search', function (): void {
