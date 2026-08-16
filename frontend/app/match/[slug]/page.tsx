@@ -1,0 +1,158 @@
+import type { Metadata } from "next";
+import { AppShell } from "@/components/AppShell";
+import { CompetitionLogo } from "@/components/CompetitionLogo";
+import { Countdown } from "@/components/Countdown";
+import { JsonLd } from "@/components/JsonLd";
+import { TeamMark } from "@/components/TeamMark";
+import { PlayerUI } from "@/features/player/PlayerUI";
+import { getMatch, getPlayback } from "@/lib/api";
+import { absoluteUrl, SITE_NAME } from "@/lib/site";
+import { formatClockTime, formatMatchDateLabel } from "@/lib/time";
+import type { Match, PlaybackPayload } from "@/lib/types";
+import { LiveMatchSummary } from "./LiveMatchSummary";
+
+export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params }: PageProps<"/match/[slug]">): Promise<Metadata> {
+  const { slug } = await params;
+  const match = await getMatch(slug);
+  const title = `${match.home_team.name} vs ${match.away_team.name} - ${match.competition.name}`;
+  const description = `${match.home_team.name} vs ${match.away_team.name} match information, kickoff time, status and verified broadcast information on RiFiTV.`;
+  const url = absoluteUrl(`/match/${match.slug}`);
+
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: { type: "article", siteName: SITE_NAME, title, description, url },
+    twitter: { card: "summary_large_image", title, description },
+  };
+}
+
+export default async function MatchPage({ params }: PageProps<"/match/[slug]">) {
+  const { slug } = await params;
+  const [match, playback] = await Promise.all([getMatch(slug), getPlayback(slug)]);
+  const sportsEventJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "SportsEvent",
+    name: `${match.home_team.name} vs ${match.away_team.name}`,
+    startDate: match.kickoff_at ?? match.scheduled_date,
+    eventStatus: match.status === "finished" ? "https://schema.org/EventCompleted" : "https://schema.org/EventScheduled",
+    competitor: [
+      { "@type": "SportsTeam", name: match.home_team.name },
+      { "@type": "SportsTeam", name: match.away_team.name },
+    ],
+    organizer: { "@type": "Organization", name: SITE_NAME, url: absoluteUrl("/") },
+    description: `${match.competition.name} match on ${formatMatchDateLabel(match)}.`,
+  };
+
+  const canPlay = playback.status === "open" && playback.sources.length > 0;
+
+  return (
+    <AppShell>
+      <JsonLd id={`sports-event-${match.id}`} data={sportsEventJsonLd} />
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <section className="space-y-4">
+          {canPlay ? (
+            <PlayerUI playback={playback} title={`${match.home_team.name} vs ${match.away_team.name}`} />
+          ) : (
+            <PrematchPanel match={match} playback={playback} />
+          )}
+          <div className="xl:hidden">
+            <LiveMatchSummary initialMatch={match} />
+          </div>
+        </section>
+        <aside className="space-y-4">
+          <div className="hidden xl:block">
+            <LiveMatchSummary initialMatch={match} />
+          </div>
+          <BroadcastPanel match={match} playback={playback} />
+        </aside>
+      </div>
+    </AppShell>
+  );
+}
+
+function PrematchPanel({ match, playback }: { match: Match; playback: PlaybackPayload }) {
+  const status = playback.status;
+  const title = match.status === "finished" || status === "ended"
+    ? "Broadcast ended"
+    : status === "tbc"
+      ? "Kickoff time will be announced"
+      : status === "unavailable"
+        ? "Broadcast is open"
+        : "Broadcast opens soon";
+  const subtitle = status === "tbc"
+    ? "Broadcast access will become available when the kickoff time is confirmed."
+    : status === "unavailable"
+      ? "No compatible authorized sources are available right now."
+      : status === "ended"
+        ? "This broadcast window has closed."
+        : `Kickoff - ${formatClockTime(match.kickoff_at)}`;
+
+  return (
+    <div className="grid min-h-[420px] place-items-center rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6 text-center">
+      <div className="mx-auto max-w-xl space-y-5">
+        <div className="mx-auto flex w-fit items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-xs font-semibold uppercase text-[var(--muted)]">
+          <CompetitionLogo competition={match.competition} />
+          {match.competition.name}
+        </div>
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+          <PanelTeam team={match.home_team} />
+          <span className="text-sm font-semibold text-[var(--muted)]">VS</span>
+          <PanelTeam team={match.away_team} />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--foreground)]">{title}</h1>
+          <p className="mt-2 text-sm text-[var(--muted)]">{subtitle}</p>
+        </div>
+        {status === "locked" || status === "opening_soon" ? (
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4">
+            <Countdown seconds={playback.window.seconds_until_open} label="Broadcast opens in" />
+          </div>
+        ) : status === "open" ? (
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4">
+            <Countdown seconds={playback.window.seconds_until_kickoff} label="Match starts in" />
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function PanelTeam({ team }: { team: Match["home_team"] }) {
+  return (
+    <div className="min-w-0 space-y-2">
+      <div className="mx-auto w-fit"><TeamMark team={team} size="lg" /></div>
+      <p className="truncate text-base font-semibold text-[var(--foreground)]">{team.name}</p>
+    </div>
+  );
+}
+
+function BroadcastPanel({ match, playback }: { match: Match; playback: PlaybackPayload }) {
+  return (
+    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
+      <h2 className="text-sm font-semibold uppercase tracking-normal text-[var(--muted)]">Broadcast</h2>
+      <div className="mt-4 space-y-3">
+        {match.broadcasts?.map((broadcast) => (
+          <div key={broadcast.id} className="rounded-md border border-[var(--border)] bg-[var(--surface-muted)] p-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="font-medium text-[var(--foreground)]">{broadcast.broadcaster.name}</span>
+              <span className="text-xs uppercase text-[var(--muted)]">{broadcast.territory}</span>
+            </div>
+            <p className="mt-1 text-sm text-[var(--muted)]">{broadcast.channel?.name ?? "Channel assignment TBC"}</p>
+          </div>
+        ))}
+        {playback.sources.map((source) => (
+          <div key={source.id} className="rounded-md border border-[var(--border)] bg-[var(--surface-muted)] p-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="font-medium text-[var(--foreground)]">{source.channel_name}</span>
+              <span className="text-xs uppercase text-[var(--muted)]">{source.protocol}</span>
+            </div>
+            <p className="mt-1 text-sm text-[var(--muted)]">{source.name}{source.is_backup ? " backup" : ""}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

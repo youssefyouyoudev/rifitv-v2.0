@@ -1,0 +1,874 @@
+{
+  "generated_at": "2026-08-14T16:04:12Z",
+  "assets": [
+    {
+      "type": "competition",
+      "name": "Premier League",
+      "local_path": "/football/competitions/premier-league.png",
+      "source_url": "https://football-logos.cc/england/english-premier-league/",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:840036b357b8f0291742d6d3ac7ba5ee649b5ea69398602862de6faf59b3e5aa",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "competition",
+      "name": "LALIGA EA SPORTS",
+      "local_path": "/football/competitions/laliga.png",
+      "source_url": "https://football-logos.cc/spain/la-liga/",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:4e113240af6f4d2f041d05174da47f8a60207150df425d181b35eaf76dfe6d6e",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "competition",
+      "name": "Ligue 1",
+      "local_path": "/football/competitions/ligue-1.png",
+      "source_url": "https://api.psg.fr/umbraco/akqa/api/v1.0/sportsImage/Competition/dm5ka0os1e3dxcp3vh05kmp33.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:34a178efb51931953d5004e9ce1a51417851354862db6e5901ab9eb9388c86f5",
+      "verification_state": "official_psg_api"
+    },
+    {
+      "type": "competition",
+      "name": "UEFA Champions League",
+      "local_path": "/football/competitions/champions-league.png",
+      "source_url": "https://api.psg.fr/umbraco/akqa/api/v1.0/sportsImage/Competition/4oogyu6o156iphvdvphwpck10.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:2b2a2856e0399689bb4116cbbff79338d803e36d05d708aff7bd4553d7e58102",
+      "verification_state": "official_psg_api"
+    },
+    {
+      "type": "club",
+      "name": "AFC Bournemouth",
+      "local_path": "/football/clubs/afc-bournemouth.png",
+      "source_url": "https://assets.football-logos.cc/logos/england/64x64/bournemouth.fb7991a0.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:1bb201a6ac81c7208dabe612f86d03ef8da7cf33674ba8b1508251c6eb1b01b8",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "AJ Auxerre",
+      "local_path": "/football/clubs/aj-auxerre.png",
+      "source_url": "https://api.psg.fr/umbraco/akqa/api/v1.0/sportsImage/Team/9bxav814mkuhueiyivyive82d.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:f32b821df591e901f1aa3101e7924d7d7088cd8779bafa470ffad086b8bfd720",
+      "verification_state": "official_psg_api"
+    },
+    {
+      "type": "club",
+      "name": "AS Monaco",
+      "local_path": "/football/clubs/as-monaco.png",
+      "source_url": "https://api.psg.fr/umbraco/akqa/api/v1.0/sportsImage/Team/4t4hod56fsj7utpjdor8so5q6.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:cf594527a94ada62e75996fe38f9094e8abf65070a00ea1a275c4cc010d841be",
+      "verification_state": "official_psg_api"
+    },
+    {
+      "type": "club",
+      "name": "Angers SCO",
+      "local_path": "/football/clubs/angers-sco.png",
+      "source_url": "https://api.psg.fr/umbraco/akqa/api/v1.0/sportsImage/Team/75qj99fhg5c0ztj2tva5u4uii.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:b7c9e30c8c231479eb992d33a3d7632bd5b132f9b62eb099c62265cc7c916833",
+      "verification_state": "official_psg_api"
+    },
+    {
+      "type": "club",
+      "name": "Arsenal",
+      "local_path": "/football/clubs/arsenal.png",
+      "source_url": "https://football-logos.cc/ asset page for Arsenal",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:94f7dbd5b116764251259e349fbefaa218f0dbba7e00bc72a128b6fe889d72bf",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Aston Villa",
+      "local_path": "/football/clubs/aston-villa.png",
+      "source_url": "https://assets.football-logos.cc/logos/england/64x64/aston-villa.54b03f58.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:5539ee18a178f92c6d8f4d3dd4b551e170e5b61998ab8dce9536ef7b87fc5619",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Athletic Club",
+      "local_path": "/football/clubs/athletic-club.png",
+      "source_url": "https://assets.football-logos.cc/logos/spain/64x64/athletic-club.a232fcdb.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:1ffb47093c0d68524a6c710276313de1b113713a5858ce4fc68d569686e42e8d",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Atlético de Madrid",
+      "local_path": "/football/clubs/atletico-de-madrid.png",
+      "source_url": "https://football-logos.cc/ asset page for Atlético de Madrid",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:87e6c4acad6c2aee59b1017fa6b3d1b33d55dfd6151f81662f502cc220b6753f",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Brentford",
+      "local_path": "/football/clubs/brentford.png",
+      "source_url": "https://assets.football-logos.cc/logos/england/64x64/brentford.d1029a2f.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:7b6091f8fe305871ec00c2cd95b66852c42299cbdc7178e9045a9bb1fd19268a",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Brighton & Hove Albion",
+      "local_path": "/football/clubs/brighton-hove-albion.png",
+      "source_url": "https://assets.football-logos.cc/logos/england/64x64/brighton.77d5400b.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:58c013d053564e8772832b1748b9a6c88cf76ccf645c12964041b09c7ad31b7c",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "CA Osasuna",
+      "local_path": "/football/clubs/ca-osasuna.png",
+      "source_url": "https://assets.football-logos.cc/logos/spain/64x64/osasuna.3bf45731.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:2d22a3efdbeb02e89869d7f4a64a7befe50b08ac5d35b9f0e773e462f9fc0b0d",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Chelsea",
+      "local_path": "/football/clubs/chelsea.png",
+      "source_url": "https://football-logos.cc/ asset page for Chelsea",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:2289e447dcc585458f9f4bc7b488419bbcbcc2e0adfd660af6276abe78d5d8b8",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Coventry City",
+      "local_path": "/football/clubs/coventry-city.png",
+      "source_url": "https://assets.football-logos.cc/logos/england/64x64/coventry-city.4ca8b244.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:26701442c794eac557d8f63cdff2b36b6b64cc1b4851e043b5c86d526a2793a4",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Crystal Palace",
+      "local_path": "/football/clubs/crystal-palace.png",
+      "source_url": "https://assets.football-logos.cc/logos/england/64x64/crystal-palace.8e863cce.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:d43aaab084f0e0b24bbaaf18e07a126bd950704d350ce36da5dccb030f52c49f",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Deportivo Alavés",
+      "local_path": "/football/clubs/deportivo-alaves.png",
+      "source_url": "https://assets.football-logos.cc/logos/spain/64x64/deportivo.8efae456.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:dc47c115455083eb48ac8dbd59839e25f34d121effb34d15e39582d8397ded1d",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Elche CF",
+      "local_path": "/football/clubs/elche-cf.png",
+      "source_url": "https://assets.football-logos.cc/logos/spain/64x64/elche.30c2c806.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:7fcb9272c3890d78e0977c4d021b91cd8eee5c6fd96b11a70c594a64695f33aa",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Espérance Sportive Troyes Aube Champagne",
+      "local_path": "/football/clubs/esperance-sportive-troyes-aube-champagne.png",
+      "source_url": "https://api.psg.fr/umbraco/akqa/api/v1.0/sportsImage/Team/3unkqo2g6ag99gd5ynz1j7vse.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:f3c0fb7cda406d067101e9519b55af4a6a9300554e198ac6d98a4d062abd2a77",
+      "verification_state": "official_psg_api"
+    },
+    {
+      "type": "club",
+      "name": "Everton",
+      "local_path": "/football/clubs/everton.png",
+      "source_url": "https://assets.football-logos.cc/logos/england/64x64/everton.c8c2ab2a.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:52db156f5d4b8e83d9c43af2be62ef15b917bc1d565dfc180b51a652a35ae806",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "FC Barcelona",
+      "local_path": "/football/clubs/fc-barcelona.png",
+      "source_url": "https://football-logos.cc/ asset page for FC Barcelona",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:382482dfb046d203301025b316ba68e36f90453ff13d6b0235cfe9a620dbf2cb",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "FC Lorient",
+      "local_path": "/football/clubs/fc-lorient.png",
+      "source_url": "https://api.psg.fr/umbraco/akqa/api/v1.0/sportsImage/Team/70nn27vgkt6l48lvv5e66q7ww.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:7aae71cef4199ff71cdc4da51ece7eb3de9dde7162dd93e2871ca8ecc664fdb9",
+      "verification_state": "official_psg_api"
+    },
+    {
+      "type": "club",
+      "name": "Fulham",
+      "local_path": "/football/clubs/fulham.png",
+      "source_url": "https://assets.football-logos.cc/logos/england/64x64/fulham.57e40ade.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:dc3c9ddd2248fdbf229c953b4850117614804446fa622016d0734782a9073640",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Getafe CF",
+      "local_path": "/football/clubs/getafe-cf.png",
+      "source_url": "https://assets.football-logos.cc/logos/spain/64x64/getafe.c9ab9614.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:7ce76b93ee32dd6837ddb13fcdbf120895d402df31c37774bb6370abff9ab689",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Hull City",
+      "local_path": "/football/clubs/hull-city.png",
+      "source_url": "https://assets.football-logos.cc/logos/england/64x64/hull-city.7d461af3.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:d3c5b760f4b22eb44f4f66e45c9592dc6cbe4c422bb8aa5b9a682e59f49fd0ab",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Ipswich Town",
+      "local_path": "/football/clubs/ipswich-town.png",
+      "source_url": "https://assets.football-logos.cc/logos/england/64x64/ipswich.15019ebf.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:47a04cea37f3df5d293012b1fa40154937377477a5620a388de23efc9912758f",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "LOSC Lille",
+      "local_path": "/football/clubs/losc-lille.png",
+      "source_url": "https://api.psg.fr/umbraco/akqa/api/v1.0/sportsImage/Team/be2k34rut1lz79jxenabttqlc.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:19f5c753c314bbb840b4f33b4335059800bdfa485a35417662ff912f7d1f39b4",
+      "verification_state": "official_psg_api"
+    },
+    {
+      "type": "club",
+      "name": "Le Havre AC",
+      "local_path": "/football/clubs/le-havre-ac.png",
+      "source_url": "https://api.psg.fr/umbraco/akqa/api/v1.0/sportsImage/Team/23pqcgxu1tip265hbe01kszbt.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:467c42e4c67544a0300ec4e1a54847ae8251f3be16476015a34f329b37a20975",
+      "verification_state": "official_psg_api"
+    },
+    {
+      "type": "club",
+      "name": "Le Mans FC",
+      "local_path": "/football/clubs/le-mans-fc.png",
+      "source_url": "https://api.psg.fr/umbraco/akqa/api/v1.0/sportsImage/Team/bj8hrmj01r3zit0x8r6qm2eu2.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:0fb7bf2fb5197fdeaf6e22ee97b5b1e819287e79d0025f278f85c80dd85036e8",
+      "verification_state": "official_psg_api"
+    },
+    {
+      "type": "club",
+      "name": "Leeds United",
+      "local_path": "/football/clubs/leeds-united.png",
+      "source_url": "https://assets.football-logos.cc/logos/england/64x64/leeds-united.d54e5411.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:6c124567a64ca8f3976d6872b8ae55da530f34ea2c4549eb2fd981f7035fc889",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Levante UD",
+      "local_path": "/football/clubs/levante-ud.png",
+      "source_url": "https://assets.football-logos.cc/logos/spain/64x64/levante.f3c56ab5.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:5836a67a5e92ac97e1887c2a04b74f8e0f2ddb07738b7fce6c50739928057769",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Liverpool",
+      "local_path": "/football/clubs/liverpool.png",
+      "source_url": "https://football-logos.cc/ asset page for Liverpool",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:48696affc877bdbed959383806573b70e8a645a537e879792ff2f70aa484f8c8",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Manchester City",
+      "local_path": "/football/clubs/manchester-city.png",
+      "source_url": "https://football-logos.cc/ asset page for Manchester City",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:782fba12cb5f6680ec91f3a045ab6e52bbca031d71254911ec1461293e332621",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Manchester United",
+      "local_path": "/football/clubs/manchester-united.png",
+      "source_url": "https://football-logos.cc/ asset page for Manchester United",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:f3d2609567b297fa911e6ce28e874251ca7647eff3bd9aa36ea53ea76c131e49",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Málaga CF",
+      "local_path": "/football/clubs/malaga-cf.png",
+      "source_url": "https://assets.football-logos.cc/logos/spain/64x64/malaga.ffcfe6c7.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:025db761c4cab72ff13fe20d456d01d9803e38b6fa562c507a54c36353383723",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Newcastle United",
+      "local_path": "/football/clubs/newcastle-united.png",
+      "source_url": "https://assets.football-logos.cc/logos/england/64x64/newcastle.c0ce4359.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:a3bfd8bbe3dec890e97e163b84be8d489f365d5a5b03c355309d1d8d052e0dbe",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Nottingham Forest",
+      "local_path": "/football/clubs/nottingham-forest.png",
+      "source_url": "https://assets.football-logos.cc/logos/england/64x64/nottingham-forest.bf3eb6d4.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:54234b10090208153caf4855ff793d34abbeb732ccffab31920df5b6551ddcd5",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "OGC Nice",
+      "local_path": "/football/clubs/ogc-nice.png",
+      "source_url": "https://api.psg.fr/umbraco/akqa/api/v1.0/sportsImage/Team/bx0cdmzr2gwr70ez72dorx82p.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:67226de6deaff782ce1e09fe05df4a06c19db9e653e43a75c9679fdc538bada2",
+      "verification_state": "official_psg_api"
+    },
+    {
+      "type": "club",
+      "name": "Olympique Lyonnais",
+      "local_path": "/football/clubs/olympique-lyonnais.png",
+      "source_url": "https://api.psg.fr/umbraco/akqa/api/v1.0/sportsImage/Team/121le8unjfzug3iu9pgkqa1c7.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:b3888949706467ef27deadc3378fe34a7b2218ad5a641d1fdc7d3680ddf51182",
+      "verification_state": "official_psg_api"
+    },
+    {
+      "type": "club",
+      "name": "Olympique de Marseille",
+      "local_path": "/football/clubs/olympique-de-marseille.png",
+      "source_url": "https://api.psg.fr/umbraco/akqa/api/v1.0/sportsImage/Team/27xvwccz8kpmqsefjv2b2sc0o.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:e7cc864c5565f7ff61b62c1c9132c0a473a200aabf6c8d7ff0c6331f36e040f6",
+      "verification_state": "official_psg_api"
+    },
+    {
+      "type": "club",
+      "name": "Paris FC",
+      "local_path": "/football/clubs/paris-fc.png",
+      "source_url": "https://api.psg.fr/umbraco/akqa/api/v1.0/sportsImage/Team/8v00fx2zwhiwm05tqqkt122p5.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:2909d61e2b1b303fbfe2be56152dc56909b589b6d0e873ad0b1fa03d2f8409f2",
+      "verification_state": "official_psg_api"
+    },
+    {
+      "type": "club",
+      "name": "Paris Saint-Germain",
+      "local_path": "/football/clubs/paris-saint-germain.png",
+      "source_url": "https://api.psg.fr/umbraco/akqa/api/v1.0/sportsImage/Team/2b3mar72yy8d6uvat1ka6tn3r.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:a5fc4086df065febe51918573c7b825cd79deda3002060fe4223961d7fc9ac4a",
+      "verification_state": "official_psg_api"
+    },
+    {
+      "type": "club",
+      "name": "R. Racing Club",
+      "local_path": "/football/clubs/r-racing-club.png",
+      "source_url": "https://assets.football-logos.cc/logos/spain/64x64/racing.eb40faa8.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:a61569c4c2b09b30a65f2fa35506179d7b7a2cd97c1fad0ad6b61867cde3d075",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "RC Celta",
+      "local_path": "/football/clubs/rc-celta.png",
+      "source_url": "https://assets.football-logos.cc/logos/spain/64x64/celta.c6be7917.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:5da4a1a8c2eb6fcae1279be3df461f202f4475a6e1acb91069ab86abb1b8c9a9",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "RC Deportivo",
+      "local_path": "/football/clubs/rc-deportivo.png",
+      "source_url": "https://assets.football-logos.cc/logos/spain/64x64/deportivo-la-coruna.7e644e02.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:2e75dc90ff56179f0663417f20cbf385c9b1409388333e30f82d9ad3bc92c1ca",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "RC Strasbourg",
+      "local_path": "/football/clubs/rc-strasbourg.png",
+      "source_url": "https://api.psg.fr/umbraco/akqa/api/v1.0/sportsImage/Team/71ajatxnuhc5cnm3xvgdky49w.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:4978c550bb1b540d27b009858b651da2251c569c7d9125583cab24b575a4a131",
+      "verification_state": "official_psg_api"
+    },
+    {
+      "type": "club",
+      "name": "RCD Espanyol de Barcelona",
+      "local_path": "/football/clubs/rcd-espanyol-de-barcelona.png",
+      "source_url": "https://assets.football-logos.cc/logos/spain/64x64/espanyol.3c923236.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:410530a84aeeb62db0080958f79ca063c4d1b78bd05921c544ddb7af94ef702e",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Racing Club de Lens",
+      "local_path": "/football/clubs/racing-club-de-lens.png",
+      "source_url": "https://api.psg.fr/umbraco/akqa/api/v1.0/sportsImage/Team/3xedluek08t2ka7oypwuullcn.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:3feea5be3f73ec7bedbe2455bdfea384196c5e8f6cfeab3e38103ba0bab70210",
+      "verification_state": "official_psg_api"
+    },
+    {
+      "type": "club",
+      "name": "Rayo Vallecano",
+      "local_path": "/football/clubs/rayo-vallecano.png",
+      "source_url": "https://assets.football-logos.cc/logos/spain/64x64/rayo-vallecano.ea807b80.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:d06cb66160041e21051b680f5fba8ac48a0ac0d5212679bcc03d7c8040b18d29",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Real Betis",
+      "local_path": "/football/clubs/real-betis.png",
+      "source_url": "https://assets.football-logos.cc/logos/spain/64x64/real-betis.63f268a8.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:79f7e60f5090d4978d5d9997c10c9ef1266dda7478393baef4392c3e04a25c81",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Real Madrid",
+      "local_path": "/football/clubs/real-madrid.png",
+      "source_url": "https://football-logos.cc/ asset page for Real Madrid",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:ee7a59ede0552de7a9ba64adde55b214f88880368297a920997ccd6cfb351555",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Real Sociedad",
+      "local_path": "/football/clubs/real-sociedad.png",
+      "source_url": "https://assets.football-logos.cc/logos/spain/64x64/real-sociedad.fc5f4f2b.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:e689d06b107a7eaff24964f82bb188e27f9146b523381aaddde1eba51fee064b",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Sevilla FC",
+      "local_path": "/football/clubs/sevilla-fc.png",
+      "source_url": "https://assets.football-logos.cc/logos/spain/64x64/sevilla.5bf9b9af.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:601219f18eb05724b84c765c045f96ed20fb866982cb0bfb1056811c83b3b1a4",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Stade Brestois 29",
+      "local_path": "/football/clubs/stade-brestois-29.png",
+      "source_url": "https://api.psg.fr/umbraco/akqa/api/v1.0/sportsImage/Team/3adj8hkws0z1al232bg2h6tk0.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:6c9df583b2ce5d193214828fe199c54a6f0990fce69fbb1463e702a9e1a86971",
+      "verification_state": "official_psg_api"
+    },
+    {
+      "type": "club",
+      "name": "Stade Rennais",
+      "local_path": "/football/clubs/stade-rennais.png",
+      "source_url": "https://api.psg.fr/umbraco/akqa/api/v1.0/sportsImage/Team/z1wbqtd0fz5t5eezjvrbld3h.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:cfdc6f54723d6583893987148ab93475f10f325fa217dc3be723313b8631906c",
+      "verification_state": "official_psg_api"
+    },
+    {
+      "type": "club",
+      "name": "Sunderland",
+      "local_path": "/football/clubs/sunderland.png",
+      "source_url": "https://assets.football-logos.cc/logos/england/64x64/sunderland.4126fb03.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:33a018eb6d078661f3b3e23bbc9e3f9a48d905a11b3cd024ca2abb3ef077428d",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Tottenham Hotspur",
+      "local_path": "/football/clubs/tottenham-hotspur.png",
+      "source_url": "https://football-logos.cc/ asset page for Tottenham Hotspur",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:e5b6c9e52e8194ab0eb45f6aa46203f854580f8bcbc141adea17ac467f3df196",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Toulouse FC",
+      "local_path": "/football/clubs/toulouse-fc.png",
+      "source_url": "https://api.psg.fr/umbraco/akqa/api/v1.0/sportsImage/Team/4aghw9tyi8ba3ju1ne83gmf9w.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:507ad41f2f02ad151c204c1de6b7f2650bcfcc27f59526534f171600979e9dae",
+      "verification_state": "official_psg_api"
+    },
+    {
+      "type": "club",
+      "name": "Valencia CF",
+      "local_path": "/football/clubs/valencia-cf.png",
+      "source_url": "https://assets.football-logos.cc/logos/spain/64x64/valencia.eb0ef5ae.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:25e705b5e9b7e737c4b30810e939b644da822ccac79d96e321e39bd12d849d23",
+      "verification_state": "third_party_normalized"
+    },
+    {
+      "type": "club",
+      "name": "Villarreal CF",
+      "local_path": "/football/clubs/villarreal-cf.png",
+      "source_url": "https://assets.football-logos.cc/logos/spain/64x64/villarreal.db083e58.png",
+      "retrieved_at": "2026-08-14T16:04:12Z",
+      "mime_type": "image/png",
+      "dimensions": {
+        "width": 256,
+        "height": 256
+      },
+      "checksum": "sha256:f19d0e27c9f715360e266342c9340beab8514b56423d7223283668aca4f314a1",
+      "verification_state": "third_party_normalized"
+    }
+  ],
+  "missing": []
+}

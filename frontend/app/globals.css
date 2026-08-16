@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f7fbfd;
+  --foreground: #08131f;
+  --surface: #ffffff;
+  --surface-muted: #eef6f9;
+  --surface-elevated: #ffffff;
+  --border: rgba(8, 19, 31, 0.12);
+  --muted: #5b6b78;
+  --brand-cyan: #06d7c6;
+  --brand-blue: #168df2;
+  --brand-ink: #07111d;
+  --focus-ring: rgba(22, 141, 242, 0.46);
+  --live: #dc2626;
+  --success: #16a34a;
+  --warning: #d97706;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html.light {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+  --background: #050910;
+  --foreground: #f5fbff;
+  --surface: #0b121d;
+  --surface-muted: #111b29;
+  --surface-elevated: #101927;
+  --border: rgba(226, 243, 255, 0.13);
+  --muted: #9aabba;
+  --brand-ink: #f8fbff;
+  --focus-ring: rgba(6, 215, 198, 0.45);
+}
+
+.theme-logo-light,
+.theme-icon-light {
+  display: block;
+}
+
+.theme-logo-dark,
+.theme-icon-dark,
+html.dark .theme-logo-light,
+html.dark .theme-icon-light {
+  display: none;
+}
+
+html.dark .theme-logo-dark,
+html.dark .theme-icon-dark {
+  display: block;
+}
+
+button,
+a,
+input,
+select {
+  min-height: 40px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
