@@ -57,12 +57,16 @@ export type Match = {
   source_timezone: string | null;
   source_matchday: number | null;
   source_round_label: string | null;
+  verification_status?: string;
   status: MatchStatus;
+  status_label?: string;
+  status_rank?: number;
   home_score: number | null;
   away_score: number | null;
   minute: number | null;
   featured: boolean;
   channels: Channel[];
+  channels_count?: number;
   broadcasts: Array<{
     id: number;
     territory: string;
@@ -72,6 +76,18 @@ export type Match = {
     channel: Channel | null;
   }>;
   playback_window: PlaybackWindow;
+  stream_available_from?: string | null;
+  stream_closes_at?: string | null;
+  admin?: {
+    verification_label: string;
+    stream_summary: {
+      channels: number;
+      sources: number;
+      enabled_sources: number;
+      healthy_sources: number;
+    };
+    warnings: string[];
+  };
   updated_at?: string | null;
 };
 

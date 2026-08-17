@@ -27,14 +27,14 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { RiFiTVLogo } from "@/components/RiFiTVLogo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { apiFetch, ApiError, csrfCookie } from "@/lib/api";
 
-type ApiList<T> = { data: T[] };
+type ApiList<T> = { data: T[]; admin_meta?: AdminMatchMeta; meta?: { current_page?: number; last_page?: number; total?: number; per_page?: number } };
 type ApiOne<T> = { data: T };
 type Entity = Record<string, unknown> & { id: number; name?: string; title?: string; slug?: string };
 type Match = Entity & {
@@ -42,6 +42,8 @@ type Match = Entity & {
   away_team: Entity;
   competition: Entity;
   status: string;
+  status_label?: string;
+  status_rank?: number;
   home_score: number | null;
   away_score: number | null;
   minute: number | null;
@@ -50,8 +52,17 @@ type Match = Entity & {
   kickoff_at: string | null;
   scheduled_date?: string | null;
   kickoff_precision?: string;
+  verification_status?: string;
   channels?: Entity[];
+  channels_count?: number;
   playback_window?: PlaybackWindow;
+  stream_available_from?: string | null;
+  stream_closes_at?: string | null;
+  admin?: {
+    verification_label: string;
+    stream_summary: { channels: number; sources: number; enabled_sources: number; healthy_sources: number };
+    warnings: string[];
+  };
 };
 type PlaybackWindow = {
   status: string;
@@ -75,6 +86,12 @@ type MatchControl = {
   assigned_channels: ControlChannel[];
   stream_summary: { channels: number; sources: number; enabled_sources: number; healthy_sources: number; offline_sources: number };
   actions: { statuses: string[]; playback: string[] };
+};
+type AdminMatchMeta = {
+  timezone: string;
+  statuses: Array<{ value: string; label: string; rank: number }>;
+  counters: Record<"today" | "live" | "upcoming" | "finished" | "needs_channel" | "needs_verification" | "featured", number>;
+  attention: Match[];
 };
 type Playlist = Entity & {
   type: string;
@@ -517,7 +534,7 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
           {error ? <Toast tone="error" message={error} onClose={() => setError(null)} /> : null}
           {active === "dashboard" ? <DashboardView dashboard={dashboard} setActive={setActive} /> : null}
           {active === "today" || active === "upcoming" ? <TodayOperationsView today={today} setActive={setActive} /> : null}
-          {active === "matches" ? <MatchManager matches={matches} teams={teams} competitions={competitions} channels={channels} run={run} adminSend={adminSend} openControl={(matchId) => { setActiveOverride(null); setControlMatchId(matchId); router.push(`/admin/matches/${matchId}/control`); }} /> : null}
+          {active === "matches" ? <MatchManager matches={matches} teams={teams} competitions={competitions} channels={channels} run={run} adminGet={adminGet} adminSend={adminSend} openControl={(matchId) => { setActiveOverride(null); setControlMatchId(matchId); router.push(`/admin/matches/${matchId}/control`); }} /> : null}
           {active === "match-control" ? <MatchControlCenter matches={matches} channels={channels} control={matchControl} selectedId={selectedControlMatchId} onSelectMatch={setControlMatchId} loadControl={loadControl} run={run} adminSend={adminSend} /> : null}
           {active === "live" ? <LiveControl matches={matches} run={run} adminSend={adminSend} /> : null}
           {active === "teams" ? <SimpleManager title="Teams" endpoint="/admin/teams" items={teams} fields={["name", "short_name", "country_code", "primary_color"]} toggles={["active", "featured"]} run={run} adminSend={adminSend} /> : null}
@@ -716,27 +733,383 @@ function OperationsView({ alerts, queueHealth, detailedHealth, syncRuns, run, ad
   );
 }
 
-function MatchManager({ matches, teams, competitions, channels, run, adminSend, openControl }: ManagerProps & { matches: Match[]; teams: Entity[]; competitions: Entity[]; channels: Entity[]; openControl: (matchId: number) => void }) {
+function MatchManager({ matches, teams, competitions, channels, run, adminGet, adminSend, openControl }: ManagerProps & { matches: Match[]; teams: Entity[]; competitions: Entity[]; channels: Entity[]; openControl: (matchId: number) => void }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [items, setItems] = useState<Match[]>(matches);
+  const [meta, setMeta] = useState<AdminMatchMeta | null>(null);
+  const [page, setPage] = useState({ current_page: 1, last_page: 1, total: matches.length, per_page: 50 });
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [assignMatch, setAssignMatch] = useState<Match | null>(null);
+  const [channelSearch, setChannelSearch] = useState("");
+  const [selectedChannelIds, setSelectedChannelIds] = useState<number[]>([]);
+  const [bulkAction, setBulkAction] = useState("verify");
+  const [bulkCompetition, setBulkCompetition] = useState("");
+  const [bulkStatus, setBulkStatus] = useState("scheduled");
+  const [filters, setFilters] = useState(() => ({
+    date: searchParams.get("date") ?? localTodayDate(),
+    competition_id: searchParams.get("competition_id") ?? "",
+    team_id: searchParams.get("team_id") ?? "",
+    status: searchParams.get("status") ?? "",
+    featured: searchParams.get("featured") ?? "",
+    channel: searchParams.get("channel") ?? "",
+    verification: searchParams.get("verification") ?? "",
+    stream_status: searchParams.get("stream_status") ?? "",
+    search: searchParams.get("search") ?? "",
+    page: searchParams.get("page") ?? "1",
+  }));
   const [form, setForm] = useState({ competition_id: "", home_team_id: "", away_team_id: "", kickoff_at: localDateTime(), featured: true, published: true, channel_ids: [] as number[] });
+
+  useEffect(() => {
+    setItems(matches);
+  }, [matches]);
+
+  useEffect(() => {
+    if (!adminGet) return;
+    const controller = new AbortController();
+
+    async function loadMatches() {
+      const params = matchQuery(filters);
+      const payload = await adminGet<ApiList<Match>>(`/admin/matches?${params.toString()}`, controller.signal);
+      setItems(payload.data);
+      setMeta(payload.admin_meta ?? null);
+      setPage({
+        current_page: payload.meta?.current_page ?? 1,
+        last_page: payload.meta?.last_page ?? 1,
+        total: payload.meta?.total ?? payload.data.length,
+        per_page: payload.meta?.per_page ?? 50,
+      });
+      setSelectedIds((ids) => ids.filter((id) => payload.data.some((match) => match.id === id)));
+    }
+
+    loadMatches().catch((caught) => {
+      if (!(caught instanceof DOMException && caught.name === "AbortError")) {
+        console.error(caught);
+      }
+    });
+
+    return () => controller.abort();
+  }, [adminGet, filters]);
+
+  function updateFilters(next: Partial<typeof filters>) {
+    const merged = { ...filters, ...next, page: next.page ?? "1" };
+    setFilters(merged);
+    router.replace(`${pathname}?${matchQuery(merged, false).toString()}`);
+  }
+
+  async function refreshMatches() {
+    if (!adminGet) return;
+    const payload = await adminGet<ApiList<Match>>(`/admin/matches?${matchQuery(filters).toString()}`);
+    setItems(payload.data);
+    setMeta(payload.admin_meta ?? null);
+  }
+
+  function toggleSelected(id: number) {
+    setSelectedIds((ids) => ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]);
+  }
+
+  function openAssign(match: Match) {
+    setAssignMatch(match);
+    setSelectedChannelIds((match.channels ?? []).map((channel) => channel.id));
+  }
+
+  async function applyBulkAction() {
+    if (selectedIds.length === 0) return;
+    if (bulkAction === "delete" && !window.confirm(`Archive ${selectedIds.length} selected matches?`)) return;
+    await run(async () => {
+      await adminSend("/admin/matches/bulk", "POST", {
+        ids: selectedIds,
+        action: bulkAction,
+        competition_id: bulkAction === "assign_competition" ? Number(bulkCompetition) : undefined,
+        status: bulkAction === "set_status" ? bulkStatus : undefined,
+        confirm_delete: bulkAction === "delete" ? true : undefined,
+      });
+      setSelectedIds([]);
+      await refreshMatches();
+    }, "Bulk match action applied");
+  }
+
+  const grouped = groupAdminMatches(items);
+  const visibleChannels = channels
+    .filter((channel) => String(channel.name ?? "").toLowerCase().includes(channelSearch.toLowerCase()))
+    .slice(0, 40);
+  const filterSummary = `${page.total} ${page.total === 1 ? "match" : "matches"} | ${meta?.timezone ?? "Africa/Casablanca"}`;
+
   return (
-    <div className="grid gap-5 xl:grid-cols-[380px_1fr]">
-      <Panel title="+ Quick Match">
-        <Select label="Competition" value={form.competition_id} options={competitions} onChange={(value) => setForm({ ...form, competition_id: value })} />
-        <Select label="Home" value={form.home_team_id} options={teams} onChange={(value) => setForm({ ...form, home_team_id: value })} />
-        <Select label="Away" value={form.away_team_id} options={teams} onChange={(value) => setForm({ ...form, away_team_id: value })} />
-        <Input label="Kickoff" type="datetime-local" value={form.kickoff_at} onChange={(value) => setForm({ ...form, kickoff_at: value })} />
-        <Select label="Broadcast" value={String(form.channel_ids[0] ?? "")} options={channels} onChange={(value) => setForm({ ...form, channel_ids: value ? [Number(value)] : [] })} />
-        <Toggle label="Featured" checked={form.featured} onChange={(featured) => setForm({ ...form, featured })} />
-        <Toggle label="Published" checked={form.published} onChange={(published) => setForm({ ...form, published })} />
-        <button className="mt-2 h-11 rounded-md bg-red-600 px-4 font-semibold text-white" onClick={() => run(async () => { await adminSend("/admin/matches", "POST", form); }, "Match created and published")}>
-          <Plus className="mr-2 inline h-4 w-4" />Create Match
-        </button>
+    <div className="space-y-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
+        {[
+          ["Today", meta?.counters.today ?? 0, { date: localTodayDate() }],
+          ["Live", meta?.counters.live ?? 0, { status: "active" }],
+          ["Upcoming", meta?.counters.upcoming ?? 0, { status: "scheduled" }],
+          ["Finished", meta?.counters.finished ?? 0, { status: "finished" }],
+          ["Needs Channel", meta?.counters.needs_channel ?? 0, { channel: "missing" }],
+          ["Needs Verification", meta?.counters.needs_verification ?? 0, { verification: "pending" }],
+          ["Featured", meta?.counters.featured ?? 0, { featured: "1" }],
+        ].map(([label, value, next]) => (
+          <button key={String(label)} className="rounded-lg border border-white/10 bg-neutral-900 p-4 text-left hover:border-red-400/40" onClick={() => updateFilters(next as Partial<typeof filters>)}>
+            <span className="text-sm text-neutral-400">{String(label)}</span>
+            <strong className="mt-2 block text-2xl text-white">{Number(value)}</strong>
+          </button>
+        ))}
+      </div>
+
+      <Panel title="Needs Attention">
+        <div className="grid gap-2 xl:grid-cols-2">
+          {(meta?.attention ?? []).map((match) => (
+            <AdminMatchLine key={match.id} match={match} action={<button className="h-9 rounded-md bg-red-600 px-3 text-xs font-semibold text-white" onClick={() => openControl(match.id)}>Manage</button>} />
+          ))}
+          {(meta?.attention ?? []).length === 0 ? <Empty message="No urgent match issues in this view." /> : null}
+        </div>
       </Panel>
-      <Panel title="Matches">
-        <MatchRows matches={matches} controls onControl={openControl} />
-      </Panel>
+
+      <div className="grid gap-5 xl:grid-cols-[360px_1fr]">
+        <div className="space-y-5">
+          <Panel title="Date">
+            <div className="grid grid-cols-2 gap-2">
+              <button className="h-10 rounded-md border border-white/10 bg-black/20 text-sm text-white" onClick={() => updateFilters({ date: addDays(filters.date || localTodayDate(), -1) })}>Previous day</button>
+              <button className="h-10 rounded-md border border-white/10 bg-black/20 text-sm text-white" onClick={() => updateFilters({ date: addDays(filters.date || localTodayDate(), 1) })}>Next day</button>
+              <button className="h-10 rounded-md bg-red-600 text-sm font-semibold text-white" onClick={() => updateFilters({ date: localTodayDate() })}>Today</button>
+              <button className="h-10 rounded-md bg-neutral-800 text-sm font-semibold text-white" onClick={() => updateFilters({ date: addDays(localTodayDate(), 1) })}>Tomorrow</button>
+            </div>
+            <Input label="Jump to date" type="date" value={filters.date} onChange={(date) => updateFilters({ date })} />
+          </Panel>
+
+          <Panel title="Filters">
+            <Input label="Search" value={filters.search} onChange={(search) => updateFilters({ search })} />
+            <Select label="Competition" value={filters.competition_id} options={competitions} onChange={(competition_id) => updateFilters({ competition_id })} />
+            <Select label="Team" value={filters.team_id} options={teams} onChange={(team_id) => updateFilters({ team_id })} />
+            <SelectRaw label="Status" value={filters.status} options={["", "scheduled", "active", "live", "halftime", "finished", "postponed", "cancelled"]} onChange={(status) => updateFilters({ status })} />
+            <SelectRaw label="Featured" value={filters.featured} options={["", "1", "0"]} onChange={(featured) => updateFilters({ featured })} />
+            <SelectRaw label="Channel assigned" value={filters.channel} options={["", "has", "missing"]} onChange={(channel) => updateFilters({ channel })} />
+            <SelectRaw label="Verification" value={filters.verification} options={["", "verified", "pending", "problem"]} onChange={(verification) => updateFilters({ verification })} />
+            <SelectRaw label="Stream status" value={filters.stream_status} options={["", "healthy", "missing", "problem"]} onChange={(stream_status) => updateFilters({ stream_status })} />
+          </Panel>
+
+          <Panel title="+ Quick Match">
+            <Select label="Competition" value={form.competition_id} options={competitions} onChange={(value) => setForm({ ...form, competition_id: value })} />
+            <Select label="Home" value={form.home_team_id} options={teams} onChange={(value) => setForm({ ...form, home_team_id: value })} />
+            <Select label="Away" value={form.away_team_id} options={teams} onChange={(value) => setForm({ ...form, away_team_id: value })} />
+            <Input label="Kickoff" type="datetime-local" value={form.kickoff_at} onChange={(value) => setForm({ ...form, kickoff_at: value })} />
+            <Select label="Broadcast" value={String(form.channel_ids[0] ?? "")} options={channels} onChange={(value) => setForm({ ...form, channel_ids: value ? [Number(value)] : [] })} />
+            <Toggle label="Featured" checked={form.featured} onChange={(featured) => setForm({ ...form, featured })} />
+            <Toggle label="Published" checked={form.published} onChange={(published) => setForm({ ...form, published })} />
+            <button className="mt-2 h-11 rounded-md bg-red-600 px-4 font-semibold text-white" onClick={() => run(async () => { await adminSend("/admin/matches", "POST", form); await refreshMatches(); }, "Match created and published")}>
+              <Plus className="mr-2 inline h-4 w-4" />Create Match
+            </button>
+          </Panel>
+        </div>
+
+        <Panel title="Matches" action={<span className="text-sm text-neutral-400">{filterSummary}</span>}>
+          {selectedIds.length > 0 ? (
+            <div className="mb-3 grid gap-2 rounded-md border border-white/10 bg-black/20 p-3 md:grid-cols-[1fr_1fr_1fr_auto]">
+              <SelectRaw label={`${selectedIds.length} selected`} value={bulkAction} options={["verify", "feature", "unfeature", "assign_competition", "set_status", "delete"]} onChange={setBulkAction} />
+              <Select label="Competition" value={bulkCompetition} options={competitions} onChange={setBulkCompetition} />
+              <SelectRaw label="Status" value={bulkStatus} options={["scheduled", "live", "halftime", "finished", "postponed", "cancelled"]} onChange={setBulkStatus} />
+              <button className="h-11 self-end rounded-md bg-red-600 px-4 text-sm font-semibold text-white" onClick={() => void applyBulkAction()}>Apply</button>
+            </div>
+          ) : null}
+          <div className="space-y-6">
+            {grouped.map((group) => (
+              <section key={group.key} className="space-y-3">
+                <h3 className="border-b border-white/10 pb-2 text-sm font-semibold uppercase text-neutral-400">{group.title}</h3>
+                <div className="grid gap-3">
+                  {group.matches.map((match) => (
+                    <AdminMatchCard
+                      key={match.id}
+                      match={match}
+                      checked={selectedIds.includes(match.id)}
+                      onCheck={() => toggleSelected(match.id)}
+                      openControl={openControl}
+                      openAssign={() => openAssign(match)}
+                      run={run}
+                      adminSend={adminSend}
+                      refreshMatches={refreshMatches}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
+            {grouped.length === 0 ? <Empty message="No matches match these filters." /> : null}
+          </div>
+          <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3">
+            <button className="h-9 rounded-md border border-white/10 px-3 text-sm text-white disabled:opacity-40" disabled={page.current_page <= 1} onClick={() => updateFilters({ page: String(page.current_page - 1) })}>Previous</button>
+            <span className="text-sm text-neutral-400">Page {page.current_page} of {page.last_page}</span>
+            <button className="h-9 rounded-md border border-white/10 px-3 text-sm text-white disabled:opacity-40" disabled={page.current_page >= page.last_page} onClick={() => updateFilters({ page: String(page.current_page + 1) })}>Next</button>
+          </div>
+        </Panel>
+      </div>
+
+      {assignMatch ? (
+        <div className="fixed inset-0 z-50 bg-black/70 p-4" role="dialog" aria-modal="true">
+          <div className="mx-auto mt-10 max-w-2xl rounded-lg border border-white/10 bg-neutral-900 p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="font-semibold text-white">Assign Channels</h2>
+                <p className="text-sm text-neutral-400">{assignMatch.home_team.name} vs {assignMatch.away_team.name}</p>
+              </div>
+              <button className="grid h-9 w-9 place-items-center rounded-md border border-white/10 text-white" onClick={() => setAssignMatch(null)} aria-label="Close channel assignment"><X className="h-4 w-4" /></button>
+            </div>
+            <Input label="Search Channels" value={channelSearch} onChange={setChannelSearch} />
+            <div className="mt-3 max-h-80 space-y-2 overflow-y-auto pr-1">
+              {visibleChannels.map((channel) => {
+                const checked = selectedChannelIds.includes(channel.id);
+                return (
+                  <label key={channel.id} className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-black/20 p-3 text-sm text-white">
+                    <span className="min-w-0 truncate">{channel.name}</span>
+                    <input type="checkbox" checked={checked} onChange={(event) => setSelectedChannelIds((ids) => event.target.checked ? [...ids, channel.id] : ids.filter((id) => id !== channel.id))} />
+                  </label>
+                );
+              })}
+            </div>
+            <div className="mt-4 flex flex-wrap justify-between gap-2">
+              <p className="text-sm text-neutral-400">First selected channel becomes primary.</p>
+              <button className="h-10 rounded-md bg-red-600 px-4 text-sm font-semibold text-white" onClick={() => run(async () => { await adminSend(`/admin/matches/${assignMatch.id}/control/channels`, "POST", { channel_ids: selectedChannelIds }); setAssignMatch(null); await refreshMatches(); }, "Channels assigned")}>Save Channels</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
+}
+
+function AdminMatchCard({ match, checked, onCheck, openControl, openAssign, run, adminSend, refreshMatches }: {
+  match: Match;
+  checked: boolean;
+  onCheck: () => void;
+  openControl: (matchId: number) => void;
+  openAssign: () => void;
+  run: ManagerProps["run"];
+  adminSend: ManagerProps["adminSend"];
+  refreshMatches: () => Promise<void>;
+}) {
+  const channels = match.channels ?? [];
+  const summary = match.admin?.stream_summary;
+  const warnings = match.admin?.warnings ?? [];
+  const score = match.status === "finished" || match.status === "live" || match.status === "halftime"
+    ? `${match.home_score ?? 0} - ${match.away_score ?? 0}`
+    : "vs";
+
+  return (
+    <article className="rounded-lg border border-white/10 bg-black/20 p-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-[28px_72px_minmax(0,1fr)_auto] sm:items-start">
+          <input aria-label={`Select ${match.home_team.name} vs ${match.away_team.name}`} type="checkbox" checked={checked} onChange={onCheck} className="mt-1" />
+          <div className="text-sm font-semibold tabular-nums text-white">{adminClock(match)}</div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold uppercase text-neutral-400">{match.competition.name}</span>
+              <AdminBadge tone={statusTone(match.status)}>{match.status_label ?? labelize(match.status)}</AdminBadge>
+              {match.featured ? <AdminBadge tone="cyan">Featured</AdminBadge> : null}
+              <AdminBadge tone={verificationTone(match.verification_status)}>{match.admin?.verification_label ?? "Pending verification"}</AdminBadge>
+            </div>
+            <h4 className="mt-1 truncate text-base font-semibold text-white">{match.home_team.name} <span className="text-neutral-500">{score}</span> {match.away_team.name}</h4>
+            <div className="mt-2 flex flex-wrap gap-2 text-xs text-neutral-400">
+              <span>Channels: {summary?.channels ?? channels.length}</span>
+              <span>Sources: {summary?.healthy_sources ?? 0}/{summary?.enabled_sources ?? 0} healthy</span>
+              <span>Stream opens {adminClock({ kickoff_at: match.stream_available_from ?? match.playback_window?.opens_at ?? null, scheduled_date: null })}</span>
+              <span>Closes {adminClock({ kickoff_at: match.stream_closes_at ?? match.playback_window?.closes_at ?? null, scheduled_date: null })}</span>
+            </div>
+            {channels.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {channels.slice(0, 4).map((channel, index) => <AdminBadge key={channel.id} tone={index === 0 ? "green" : "neutral"}>{index === 0 ? "Primary: " : ""}{String(channel.name)}</AdminBadge>)}
+                {channels.length > 4 ? <AdminBadge tone="neutral">+{channels.length - 4}</AdminBadge> : null}
+              </div>
+            ) : null}
+            {warnings.length > 0 ? (
+              <div className="mt-2 grid gap-1">
+                {warnings.slice(0, 3).map((warning) => <span key={warning} className="text-xs font-medium text-yellow-100">{warning}</span>)}
+              </div>
+            ) : null}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2 lg:max-w-xs lg:justify-end">
+          <button className="h-9 rounded-md bg-red-600 px-3 text-xs font-semibold text-white" onClick={() => openControl(match.id)}>Manage</button>
+          <button className="h-9 rounded-md border border-white/10 px-3 text-xs text-white" onClick={openAssign}>Assign Channel</button>
+          <button className="h-9 rounded-md border border-white/10 px-3 text-xs text-white" onClick={() => run(async () => { await adminSend(`/admin/matches/${match.id}/control/feature`, "PATCH", { featured: !match.featured }); await refreshMatches(); }, match.featured ? "Match unfeatured" : "Match featured")}>{match.featured ? "Unfeature" : "Feature"}</button>
+          {["live", "halftime", "finished", "postponed"].map((status) => (
+            <button key={status} className="h-9 rounded-md border border-white/10 px-3 text-xs text-white" onClick={() => run(async () => { await adminSend(`/admin/matches/${match.id}/control/status`, "PATCH", { status, override_transition: true }); await refreshMatches(); }, `Marked ${status}`)}>{labelize(status)}</button>
+          ))}
+          <button className="h-9 rounded-md border border-white/10 px-3 text-xs text-white" onClick={() => run(async () => { await adminSend(`/admin/matches/${match.id}/duplicate`, "POST"); await refreshMatches(); }, "Match duplicated")}>Duplicate</button>
+          <button className="h-9 rounded-md border border-red-500/30 px-3 text-xs text-red-200" onClick={() => { if (window.confirm("Archive this match?")) void run(async () => { await adminSend(`/admin/matches/${match.id}`, "DELETE"); await refreshMatches(); }, "Match archived"); }}>Delete</button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function AdminMatchLine({ match, action }: { match: Match; action?: ReactNode }) {
+  const warning = match.admin?.warnings?.[0] ?? "Needs attention";
+  return <CardLine title={`${adminClock(match)} ${match.home_team.name} vs ${match.away_team.name}`} meta={`${match.competition.name} | ${warning}`} action={action} />;
+}
+
+function AdminBadge({ tone, children }: { tone: "red" | "yellow" | "green" | "cyan" | "neutral"; children: ReactNode }) {
+  const classes = {
+    red: "bg-red-500/15 text-red-100",
+    yellow: "bg-yellow-500/15 text-yellow-100",
+    green: "bg-green-500/15 text-green-100",
+    cyan: "bg-cyan-500/15 text-cyan-100",
+    neutral: "bg-white/10 text-neutral-200",
+  };
+
+  return <span className={`rounded-md px-2 py-1 text-[11px] font-semibold ${classes[tone]}`}>{children}</span>;
+}
+
+function groupAdminMatches(matches: Match[]): Array<{ key: string; title: string; matches: Match[] }> {
+  const groups = new Map<string, Match[]>();
+
+  for (const match of matches) {
+    const key = adminDateKey(match);
+    groups.set(key, [...(groups.get(key) ?? []), match]);
+  }
+
+  return [...groups.entries()].map(([key, values]) => ({ key, title: adminDateHeading(key), matches: values }));
+}
+
+function matchQuery(filters: Record<string, string>, includePagination = true): URLSearchParams {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (!value) return;
+    if (!includePagination && key === "page") return;
+    params.set(key, value);
+  });
+  if (includePagination) {
+    params.set("per_page", "50");
+  }
+
+  return params;
+}
+
+function adminDateKey(match: Pick<Match, "kickoff_at" | "scheduled_date">): string {
+  if (match.kickoff_at) return localDateKey(new Date(match.kickoff_at));
+  return match.scheduled_date ?? "tbc";
+}
+
+function adminDateHeading(key: string): string {
+  if (key === "tbc") return "Date TBC";
+  if (key === localTodayDate()) return `Today - ${adminDateFormatter.format(new Date(`${key}T12:00:00Z`))}`;
+  if (key === addDays(localTodayDate(), 1)) return `Tomorrow - ${adminDateFormatter.format(new Date(`${key}T12:00:00Z`))}`;
+  return adminDateFormatter.format(new Date(`${key}T12:00:00Z`));
+}
+
+function adminClock(match: Pick<Match, "kickoff_at" | "scheduled_date">): string {
+  if (match.kickoff_at) return adminTimeFormatter.format(new Date(match.kickoff_at));
+  return match.scheduled_date ? "Time TBC" : "TBC";
+}
+
+function statusTone(status: string): "red" | "yellow" | "green" | "cyan" | "neutral" {
+  if (status === "live") return "red";
+  if (status === "halftime") return "yellow";
+  if (status === "finished") return "green";
+  if (status === "scheduled") return "cyan";
+  return "neutral";
+}
+
+function verificationTone(status?: string): "red" | "yellow" | "green" | "cyan" | "neutral" {
+  if (status === "verified" || status === "manual_verified") return "green";
+  if (status === "pending_verification") return "yellow";
+  return "red";
 }
 
 function MatchControlCenter({ matches, channels, control, selectedId, onSelectMatch, loadControl, run, adminSend }: ManagerProps & { matches: Match[]; channels: Entity[]; control: MatchControl | null; selectedId: number | null; onSelectMatch: (matchId: number) => void; loadControl: (matchId: number) => Promise<void> }) {
@@ -1135,7 +1508,11 @@ function AuditLog({ items }: { items: Entity[] }) {
   return <Panel title="Audit Log"><div className="grid gap-2">{items.map((item) => <CardLine key={item.id} title={String(item.action)} meta={String(item.created_at ?? "")} />)}</div></Panel>;
 }
 
-type ManagerProps = { run: (action: () => Promise<void>, success: string) => Promise<void>; adminSend: <T>(path: string, method: string, body?: unknown) => Promise<T> };
+type ManagerProps = {
+  run: (action: () => Promise<void>, success: string) => Promise<void>;
+  adminSend: <T>(path: string, method: string, body?: unknown) => Promise<T>;
+  adminGet?: <T>(path: string, signal?: AbortSignal) => Promise<T>;
+};
 function Panel({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) { return <section className="rounded-lg border border-white/10 bg-neutral-900 p-4"><div className="mb-4 flex items-center justify-between gap-3"><h2 className="font-semibold text-white">{title}</h2>{action}</div><div className="space-y-3">{children}</div></section>; }
 function Stat({ label, value }: { label: string; value: number }) { return <div className="rounded-lg border border-white/10 bg-neutral-900 p-4"><span className="text-sm capitalize text-neutral-400">{label}</span><strong className="mt-2 block text-2xl text-white">{value}</strong></div>; }
 function Input({ label, value, onChange, type = "text", autoFocus = false, autoComplete }: { label: string; value: string; onChange: (value: string) => void; type?: string; autoFocus?: boolean; autoComplete?: string }) { return <label className="block text-sm font-medium text-neutral-300">{label}<input autoFocus={autoFocus} autoComplete={autoComplete} type={type} className="mt-1 h-11 w-full rounded-md border border-white/10 bg-black px-3 text-white outline-none focus-visible:ring-2 focus-visible:ring-red-300" value={value} onChange={(event) => onChange(event.target.value)} /></label>; }

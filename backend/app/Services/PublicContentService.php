@@ -40,14 +40,12 @@ class PublicContentService
         $endUtc = $localNow->copy()->endOfDay()->utc();
 
         $base = GameMatch::query()->published()->publicGraph();
-        $scheduleOrder = 'COALESCE(kickoff_at, scheduled_date)';
         $todayQuery = fn ($query) => $query
             ->whereBetween('kickoff_at', [$startUtc, $endUtc])
             ->orWhereDate('scheduled_date', $localDate);
         $today = (clone $base)
             ->where($todayQuery)
-            ->orderByRaw("CASE status WHEN 'live' THEN 0 WHEN 'halftime' THEN 0 WHEN 'scheduled' THEN 1 WHEN 'finished' THEN 2 ELSE 3 END")
-            ->orderByRaw($scheduleOrder)
+            ->scheduleOrder()
             ->limit(24)
             ->get();
 
@@ -64,7 +62,7 @@ class PublicContentService
                     ->where('kickoff_at', '>', $endUtc)
                     ->orWhereDate('scheduled_date', '>', $localDate))
                 ->where('status', MatchStatus::Scheduled)
-                ->orderByRaw($scheduleOrder)
+                ->scheduleOrder()
                 ->first(),
             'announcements' => Announcement::query()
                 ->where('active', true)

@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class GameMatch extends Model
@@ -130,6 +131,38 @@ class GameMatch extends Model
             ->whereNotNull('published_at')
             ->where('visibility', MatchVisibility::Public)
             ->whereIn('verification_status', ['verified', 'manual_verified']);
+    }
+
+    public function scopeOnLocalDate(Builder $query, string $date, ?string $timezone = null): Builder
+    {
+        $timezone ??= (string) config('rifitv.display_timezone', 'Africa/Casablanca');
+        $localDay = Carbon::parse($date, $timezone);
+        $startUtc = $localDay->copy()->startOfDay()->utc();
+        $endUtc = $localDay->copy()->endOfDay()->utc();
+
+        return $query->where(function (Builder $dateQuery) use ($date, $startUtc, $endUtc): void {
+            $dateQuery
+                ->whereBetween('kickoff_at', [$startUtc, $endUtc])
+                ->orWhereDate('scheduled_date', $date);
+        });
+    }
+
+    public function scopeScheduleOrder(Builder $query, string $direction = 'asc'): Builder
+    {
+        $direction = strtolower($direction) === 'desc' ? 'DESC' : 'ASC';
+
+        return $query
+            ->orderByRaw("CASE status WHEN 'live' THEN 0 WHEN 'halftime' THEN 1 WHEN 'scheduled' THEN 2 WHEN 'finished' THEN 3 WHEN 'postponed' THEN 4 WHEN 'cancelled' THEN 5 ELSE 6 END")
+            ->orderByRaw("COALESCE(kickoff_at, scheduled_date) {$direction}")
+            ->orderBy('competition_id')
+            ->orderBy('id');
+    }
+
+    public function scopeFinishedOrder(Builder $query): Builder
+    {
+        return $query
+            ->orderByRaw('COALESCE(kickoff_at, actual_started_at, scheduled_date) DESC')
+            ->orderByDesc('id');
     }
 
     public function getScoreLabelAttribute(): string

@@ -19,7 +19,7 @@ class CompetitionController extends Controller
     {
         $competition = Competition::query()
             ->where('slug', $slug)
-            ->with(['matches' => fn ($query) => $query->published()->publicGraph()->orderByRaw('COALESCE(kickoff_at, scheduled_date)')])
+            ->with(['matches' => fn ($query) => $query->published()->publicGraph()->scheduleOrder()])
             ->firstOrFail();
 
         return new CompetitionResource($competition);

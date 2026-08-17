@@ -8,24 +8,21 @@ use App\Http\Requests\LiveControlRequest;
 use App\Http\Resources\MatchResource;
 use App\Models\GameMatch;
 use App\Services\LiveMatchService;
+use App\Services\MatchScheduleService;
 use App\Services\MatchService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class AdminMatchController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, MatchScheduleService $schedule)
     {
-        $matches = GameMatch::query()
-            ->publicGraph()
-            ->when($request->filled('search'), fn ($query) => $query->where('slug', 'like', '%'.$request->string('search').'%'))
-            ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))
-            ->when($request->filled('competition_id'), fn ($query) => $query->where('competition_id', $request->integer('competition_id')))
-            ->when($request->filled('team_id'), fn ($query) => $query->where(fn ($teamQuery) => $teamQuery->where('home_team_id', $request->integer('team_id'))->orWhere('away_team_id', $request->integer('team_id'))))
-            ->when($request->has('featured'), fn ($query) => $query->where('featured', $request->boolean('featured')))
-            ->orderByRaw('COALESCE(kickoff_at, scheduled_date) DESC')
+        $matches = $schedule->adminQuery($request)
             ->paginate((int) min($request->integer('per_page', 20), 100));
 
-        return MatchResource::collection($matches);
+        return MatchResource::collection($matches)->additional([
+            'admin_meta' => $schedule->adminMeta($request),
+        ]);
     }
 
     public function store(AdminMatchRequest $request, MatchService $service)
@@ -68,9 +65,12 @@ class AdminMatchController extends Controller
         $validated = $request->validate([
             'ids' => ['required', 'array'],
             'ids.*' => ['integer', 'exists:matches,id'],
-            'action' => ['required', 'in:publish,unpublish,feature,unfeature,delete'],
+            'action' => ['required', 'in:publish,unpublish,feature,unfeature,verify,assign_competition,set_status,delete'],
+            'competition_id' => ['required_if:action,assign_competition', 'integer', 'exists:competitions,id'],
+            'status' => ['required_if:action,set_status', Rule::in(['scheduled', 'live', 'halftime', 'finished', 'postponed', 'cancelled'])],
+            'confirm_delete' => ['required_if:action,delete', 'accepted'],
         ]);
 
-        return response()->json(['data' => ['updated' => $service->bulk($validated['ids'], $validated['action'], $request->user())]]);
+        return response()->json(['data' => ['updated' => $service->bulk($validated['ids'], $validated['action'], $request->user(), $validated)]]);
     }
 }

@@ -2,6 +2,8 @@
 
 namespace App\Http\Resources;
 
+use App\Enums\MatchStatus;
+use App\Models\Channel;
 use App\Services\PlaybackWindowService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -36,6 +38,8 @@ class MatchResource extends JsonResource
             'source_verified_at' => $this->source_verified_at?->toIso8601String(),
             'verification_status' => $this->verification_status,
             'status' => $this->status->value,
+            'status_label' => $this->status->label(),
+            'status_rank' => $this->status->scheduleRank(),
             'home_score' => $this->home_score,
             'away_score' => $this->away_score,
             'minute' => $this->minute,
@@ -48,9 +52,79 @@ class MatchResource extends JsonResource
             'last_synced_at' => $this->last_synced_at?->toIso8601String(),
             'sync_status' => $this->sync_status,
             'manual_overrides' => $this->manual_overrides,
+            'stream_available_from' => $playbackWindow['opens_at'],
+            'stream_closes_at' => $playbackWindow['closes_at'],
+            'channels_count' => $this->whenCounted('channels'),
             'channels' => ChannelResource::collection($this->whenLoaded('channels')),
             'broadcasts' => MatchBroadcastResource::collection($this->whenLoaded('broadcasts')),
             'playback_window' => $playbackWindow,
+            'admin' => [
+                'verification_label' => $this->verificationLabel(),
+                'stream_summary' => $this->streamSummary(),
+                'warnings' => $this->warnings(),
+            ],
         ];
+    }
+
+    private function verificationLabel(): string
+    {
+        return match ((string) $this->verification_status) {
+            'verified', 'manual_verified' => 'Verified',
+            'pending_verification' => 'Pending verification',
+            default => 'Needs review',
+        };
+    }
+
+    /** @return array<string,int> */
+    private function streamSummary(): array
+    {
+        if (! $this->resource->relationLoaded('channels')) {
+            return [
+                'channels' => (int) ($this->channels_count ?? 0),
+                'sources' => 0,
+                'enabled_sources' => 0,
+                'healthy_sources' => 0,
+            ];
+        }
+
+        $sources = $this->channels->flatMap(fn (Channel $channel) => $channel->relationLoaded('streamSources') ? $channel->streamSources : collect());
+
+        return [
+            'channels' => $this->channels->count(),
+            'sources' => $sources->count(),
+            'enabled_sources' => $sources->where('enabled', true)->count(),
+            'healthy_sources' => $sources->where('last_known_status.value', 'healthy')->count(),
+        ];
+    }
+
+    /** @return list<string> */
+    private function warnings(): array
+    {
+        $warnings = [];
+        $summary = $this->streamSummary();
+        $now = now();
+
+        if ($this->kickoff_at && $this->status === MatchStatus::Scheduled && $now->lte($this->kickoff_at) && $now->diffInMinutes($this->kickoff_at, false) <= 30 && $summary['channels'] === 0) {
+            $warnings[] = 'Match starts in 30 min but has no channel';
+        }
+
+        if (in_array($this->status, [MatchStatus::Live, MatchStatus::Halftime], true) && $summary['healthy_sources'] === 0) {
+            $warnings[] = 'Match is live but no healthy stream source exists';
+        }
+
+        if ($this->verification_status === 'pending_verification') {
+            $warnings[] = 'Fixture pending verification';
+        } elseif (! in_array((string) $this->verification_status, ['verified', 'manual_verified'], true)) {
+            $warnings[] = 'Fixture needs review';
+        }
+
+        if ($this->kickoff_at && $this->scheduled_date) {
+            $localDate = $this->kickoff_at->copy()->timezone((string) config('rifitv.display_timezone', 'Africa/Casablanca'))->toDateString();
+            if ($localDate !== $this->scheduled_date->toDateString()) {
+                $warnings[] = 'Kickoff date conflicts with verified source';
+            }
+        }
+
+        return $warnings;
     }
 }

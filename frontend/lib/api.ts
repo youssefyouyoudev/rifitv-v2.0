@@ -110,7 +110,7 @@ export async function getHome(): Promise<HomePayload> {
   return (await apiGet<ApiEnvelope<HomePayload>>("/home")).data;
 }
 
-export async function getMatches(status?: string, competition?: string): Promise<Match[]> {
+export async function getMatches(status?: string, competition?: string, date?: string, search?: string): Promise<Match[]> {
   const params = new URLSearchParams();
   if (status) {
     params.set("status", status);
@@ -118,6 +118,13 @@ export async function getMatches(status?: string, competition?: string): Promise
   if (competition) {
     params.set("competition", competition);
   }
+  if (date) {
+    params.set("date", date);
+  }
+  if (search) {
+    params.set("search", search);
+  }
+  params.set("per_page", "50");
   const query = params.toString() ? `?${params.toString()}` : "";
 
   return (await apiGet<Paginated<Match>>(`/matches${query}`)).data;

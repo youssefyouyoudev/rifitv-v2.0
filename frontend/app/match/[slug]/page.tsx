@@ -80,8 +80,8 @@ function PrematchPanel({ match, playback }: { match: Match; playback: PlaybackPa
     : status === "tbc"
       ? "Kickoff time will be announced"
       : status === "unavailable"
-        ? "Broadcast is open"
-        : "Broadcast opens soon";
+        ? "Broadcast unavailable"
+        : "Stream available soon";
   const subtitle = status === "tbc"
     ? "Broadcast access will become available when the kickoff time is confirmed."
     : status === "unavailable"
@@ -108,7 +108,7 @@ function PrematchPanel({ match, playback }: { match: Match; playback: PlaybackPa
         </div>
         {status === "locked" || status === "opening_soon" ? (
           <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4">
-            <Countdown seconds={playback.window.seconds_until_open} label="Broadcast opens in" />
+            <Countdown seconds={playback.window.seconds_until_open} label="Stream available in" />
           </div>
         ) : status === "open" ? (
           <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4">

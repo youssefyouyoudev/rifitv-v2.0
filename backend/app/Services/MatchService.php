@@ -64,7 +64,7 @@ class MatchService
         $this->audit->record($actor, 'match.archived', $match);
     }
 
-    public function bulk(array $ids, string $action, ?User $actor): int
+    public function bulk(array $ids, string $action, ?User $actor, array $options = []): int
     {
         $matches = GameMatch::query()->whereIn('id', $ids)->get();
 
@@ -74,12 +74,15 @@ class MatchService
                 'unpublish' => $match->update(['published_at' => null]),
                 'feature' => $match->update(['featured' => true]),
                 'unfeature' => $match->update(['featured' => false]),
+                'verify' => $match->update(['verification_status' => 'manual_verified', 'source_verified_at' => now()]),
+                'assign_competition' => $match->update(['competition_id' => (int) $options['competition_id']]),
+                'set_status' => $match->update(['status' => MatchStatus::from($options['status'])]),
                 'delete' => $match->delete(),
                 default => null,
             };
         }
 
-        $this->audit->record($actor, 'matches.bulk_'.$action, null, ['count' => $matches->count()]);
+        $this->audit->record($actor, 'matches.bulk_'.$action, null, ['count' => $matches->count(), 'options' => $options]);
 
         return $matches->count();
     }
