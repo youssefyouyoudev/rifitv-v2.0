@@ -289,28 +289,6 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
   }, []);
 
   useEffect(() => {
-    if (authStatus !== "authenticated" || searchQuery.length < 2) {
-      return;
-    }
-    const controller = new AbortController();
-    const handle = window.setTimeout(async () => {
-      try {
-        const payload = await adminGet<ApiList<Entity>>(`/admin/search?q=${encodeURIComponent(searchQuery)}`, controller.signal);
-        setSearchResults(payload.data);
-      } catch (caught) {
-        if (!(caught instanceof DOMException && caught.name === "AbortError")) {
-          setSearchResults([]);
-          handleApiFailure(caught);
-        }
-      }
-    }, 400);
-    return () => {
-      window.clearTimeout(handle);
-      controller.abort();
-    };
-  }, [searchQuery, authStatus]);
-
-  useEffect(() => {
     if (authStatus !== "authenticated" || active !== "match-control" || !selectedControlMatchId) {
       return;
     }
@@ -507,12 +485,34 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
     setMatchControl(payload.data);
   }
 
-  function handleApiFailure(caught: unknown) {
+  const handleApiFailure = useCallback((caught: unknown) => {
     const message = apiErrorMessage(caught);
 
     setError(message);
     syncAuthFromError(caught);
-  }
+  }, [syncAuthFromError]);
+
+  useEffect(() => {
+    if (authStatus !== "authenticated" || searchQuery.length < 2) {
+      return;
+    }
+    const controller = new AbortController();
+    const handle = window.setTimeout(async () => {
+      try {
+        const payload = await adminGet<ApiList<Entity>>(`/admin/search?q=${encodeURIComponent(searchQuery)}`, controller.signal);
+        setSearchResults(payload.data);
+      } catch (caught) {
+        if (!(caught instanceof DOMException && caught.name === "AbortError")) {
+          setSearchResults([]);
+          handleApiFailure(caught);
+        }
+      }
+    }, 400);
+    return () => {
+      window.clearTimeout(handle);
+      controller.abort();
+    };
+  }, [adminGet, authStatus, handleApiFailure, searchQuery]);
 
   async function run(action: () => Promise<void>, success: string) {
     try {
@@ -864,14 +864,6 @@ function MatchManager({ matches, teams, competitions, channels, run, adminGet, a
   const [form, setForm] = useState({ competition_id: "", home_team_id: "", away_team_id: "", kickoff_at: localDateTime(), featured: false, published: true, channel_ids: [] as number[] });
 
   useEffect(() => {
-    setItems(matches);
-  }, [matches]);
-
-  useEffect(() => {
-    setSearchDraft(filters.search);
-  }, [filters.search]);
-
-  useEffect(() => {
     if (searchDraft === filters.search) return;
     const timeout = window.setTimeout(() => updateFilters({ search: searchDraft }), 350);
 
@@ -908,6 +900,9 @@ function MatchManager({ matches, teams, competitions, channels, run, adminGet, a
 
   function updateFilters(next: Partial<typeof filters>) {
     const merged = { ...filters, ...next, page: next.page ?? "1" };
+    if (next.search !== undefined) {
+      setSearchDraft(next.search);
+    }
     setFilters(merged);
     router.replace(`${pathname}?${matchQuery(merged, false).toString()}`);
   }
