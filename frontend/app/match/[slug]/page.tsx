@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AdPlacement } from "@/components/AdPlacement";
+import { SidebarAd } from "@/components/ads/SidebarAd";
 import { AppShell } from "@/components/AppShell";
 import { CompetitionLogo } from "@/components/CompetitionLogo";
 import { Countdown } from "@/components/Countdown";
@@ -90,6 +91,7 @@ export default async function MatchPage({ params }: PageProps<"/match/[slug]">) 
           <AdPlacement name="match_below_player" />
         </section>
         <aside className="space-y-4">
+          <SidebarAd />
           <LiveMatchSummary initialMatch={match} />
           <BroadcastPanel match={match} playback={playback} />
           <AdPlacement name="match_sidebar" />

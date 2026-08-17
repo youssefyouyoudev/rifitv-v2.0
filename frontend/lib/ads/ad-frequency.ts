@@ -5,18 +5,31 @@ const aggressiveCountKey = "rifitv:ads:session-aggressive-count";
 const lastAggressiveKey = "rifitv:ads:last-aggressive-at";
 const lastDirectLinkKey = "rifitv:ads:last-direct-link-at";
 const lastVignetteKey = "rifitv:ads:last-vignette-at";
+const lastPopKey = "rifitv:ads:last-pop-at";
 const prewatchShownKey = "rifitv:ads:prewatch-shown";
+const midrollLastShownKey = "rifitv:ads:last-midroll-at";
+const mobileStickyShownKey = "rifitv:ads:sticky-shown-this-view";
+
+// ---------------------------------------------------------------------------
+// Pre-watch gate
+// ---------------------------------------------------------------------------
 
 export function canShowPrewatchGate(): boolean {
-  return AD_SETTINGS.enabled
-    && AD_SETTINGS.prewatchEnabled
-    && readSessionValue(prewatchShownKey) !== "true"
-    && canRequestAggressive("unknown").allowed;
+  return (
+    AD_SETTINGS.enabled &&
+    AD_SETTINGS.prewatchEnabled &&
+    readSessionValue(prewatchShownKey) !== "true" &&
+    canRequestAggressive("unknown").allowed
+  );
 }
 
 export function markPrewatchGateShown(): void {
   writeSessionValue(prewatchShownKey, "true");
 }
+
+// ---------------------------------------------------------------------------
+// Aggressive ad frequency
+// ---------------------------------------------------------------------------
 
 export function canRequestAggressive(format: AdFormat, now = Date.now()): { allowed: boolean; reason?: string } {
   if (!AD_SETTINGS.enabled) return { allowed: false, reason: "ads_disabled" };
@@ -46,6 +59,13 @@ export function canRequestAggressive(format: AdFormat, now = Date.now()): { allo
     }
   }
 
+  if (format === "onclick") {
+    const lastPopAt = Number(readLocalValue(lastPopKey) ?? 0);
+    if (minutesSince(lastPopAt, now) < AD_SETTINGS.popCooldownMinutes) {
+      return { allowed: false, reason: "pop_cooldown" };
+    }
+  }
+
   return { allowed: true };
 }
 
@@ -61,7 +81,42 @@ export function markAggressiveRequested(format: AdFormat, now = Date.now()): voi
   if (format === "vignette") {
     writeLocalValue(lastVignetteKey, String(now));
   }
+
+  if (format === "onclick") {
+    writeLocalValue(lastPopKey, String(now));
+  }
 }
+
+// ---------------------------------------------------------------------------
+// Mid-roll overlay (30-min viewing intervals)
+// ---------------------------------------------------------------------------
+
+export function canShowMidrollOverlay(now = Date.now()): boolean {
+  if (!AD_SETTINGS.enabled || !AD_SETTINGS.normalEnabled) return false;
+  const lastAt = Number(readLocalValue(midrollLastShownKey) ?? 0);
+  return minutesSince(lastAt, now) >= AD_SETTINGS.midrollIntervalMinutes;
+}
+
+export function markMidrollShown(now = Date.now()): void {
+  writeLocalValue(midrollLastShownKey, String(now));
+}
+
+// ---------------------------------------------------------------------------
+// Mobile sticky (once per page view/session, resets on navigation)
+// ---------------------------------------------------------------------------
+
+export function canShowMobileSticky(): boolean {
+  if (!AD_SETTINGS.enabled || !AD_SETTINGS.normalEnabled) return false;
+  return readSessionValue(mobileStickyShownKey) !== "true";
+}
+
+export function markMobileStickyShown(): void {
+  writeSessionValue(mobileStickyShownKey, "true");
+}
+
+// ---------------------------------------------------------------------------
+// Utilities
+// ---------------------------------------------------------------------------
 
 function minutesSince(timestamp: number, now: number): number {
   if (!timestamp) return Number.POSITIVE_INFINITY;

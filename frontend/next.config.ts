@@ -5,19 +5,59 @@ const apiBase =
   "http://127.0.0.1:8000/api/v1";
 
 const apiOrigin = new URL(apiBase).origin;
-const adScriptDomains = "https://quge5.com https://5gvci.com https://nap5k.com https://n6wxm.com";
-const adConnectDomains = `${adScriptDomains} https://omg10.com`;
+
+// ---------------------------------------------------------------------------
+// Ad provider domains — only the exact domains used by our ad codes
+// ---------------------------------------------------------------------------
+
+// script-src: domains that serve JavaScript we execute
+const adScriptSrc = [
+  "https://www.highperformanceformat.com", // HPF banner invoke.js (all sizes)
+  "https://pl30892961.effectivecpmnetwork.com", // ecpm supplemental script 1
+  "https://pl30892962.effectivecpmnetwork.com", // ecpm supplemental script 2
+  "https://pl30892964.effectivecpmnetwork.com", // ecpm native invoke.js
+  "https://www.effectivecpmnetwork.com",         // ecpm direct link redirect JS
+  "https://quge5.com",                           // zone248721, zone250801
+  "https://5gvci.com",                           // zone11137945
+  "https://nap5k.com",                           // zone11137952
+  "https://n6wxm.com",                           // zone11137954 (vignette)
+  "https://omg10.com",                           // zone11137969
+].join(" ");
+
+// frame-src: domains that load in iframes (HPF renders banners as iframes)
+const adFrameSrc = [
+  "https://www.highperformanceformat.com",
+  "https://pl30892964.effectivecpmnetwork.com",
+  "https://www.effectivecpmnetwork.com",
+].join(" ");
+
+// connect-src: fetch/XHR/beacon to ad domains
+const adConnectSrc = [
+  "https://www.highperformanceformat.com",
+  "https://pl30892961.effectivecpmnetwork.com",
+  "https://pl30892962.effectivecpmnetwork.com",
+  "https://pl30892964.effectivecpmnetwork.com",
+  "https://www.effectivecpmnetwork.com",
+  "https://quge5.com",
+  "https://5gvci.com",
+  "https://nap5k.com",
+  "https://n6wxm.com",
+  "https://omg10.com",
+].join(" ");
+
+// img-src: ad networks may serve tracking pixels / ad images
+// The existing 'https:' wildcard already covers these, preserved as-is.
 
 const cspHeader = `
   default-src 'self';
-  connect-src 'self' ${apiOrigin} https://rifitv.com https://www.rifitv.com https://cloudflareinsights.com ${adConnectDomains};
+  connect-src 'self' ${apiOrigin} https://rifitv.com https://www.rifitv.com https://cloudflareinsights.com ${adConnectSrc};
   img-src 'self' data: https: blob:;
   media-src 'self' blob: https: http:;
-  script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com ${adScriptDomains};
+  script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com ${adScriptSrc};
   style-src 'self' 'unsafe-inline';
   font-src 'self' data: https:;
   worker-src 'self' blob:;
-  frame-src 'self' https:;
+  frame-src 'self' https: ${adFrameSrc};
   frame-ancestors 'none';
   object-src 'none';
   base-uri 'self';

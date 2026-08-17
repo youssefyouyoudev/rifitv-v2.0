@@ -2,7 +2,22 @@
 
 import { trackEvent } from "@/lib/analytics";
 import { canRequestAggressive, markAggressiveRequested } from "./ad-frequency";
-import { AD_PLACEMENT_ZONES, AD_ROUTE_POLICY, AD_SETTINGS, AD_ZONES, AGGRESSIVE_ROTATION, type AdAggression, type AdDevice, type AdPlacementName, type AdRoute, type AdZone } from "./config";
+import {
+  AD_PLACEMENT_ZONES,
+  AD_ROUTE_POLICY,
+  AD_SETTINGS,
+  AD_ZONES,
+  AGGRESSIVE_ROTATION,
+  ECPM_SCRIPTS,
+  HPF_BANNER_ZONES,
+  NATIVE_AD,
+  type AdAggression,
+  type AdDevice,
+  type AdPlacementName,
+  type AdRoute,
+  type AdZone,
+  type BannerZone,
+} from "./config";
 import { detectAdDevice } from "./device";
 
 declare global {
@@ -11,9 +26,11 @@ declare global {
   }
 }
 
+// Module-level dedup (SSR-safe fallback for SSR context)
 const loadedZones = new Set<string>();
 
 export type AdLoadResult = { loaded: boolean; zone?: AdZone; reason?: string };
+export type BannerAdResult = { loaded: boolean; zone?: BannerZone; reason?: string };
 
 export function resetAdManagerForTests(): void {
   loadedZones.clear();
@@ -23,7 +40,15 @@ export function resetAdManagerForTests(): void {
   }
 }
 
-export function eligibleForAds(route: AdRoute, device: AdDevice, aggression: AdAggression): { allowed: boolean; reason?: string } {
+// ---------------------------------------------------------------------------
+// Eligibility check
+// ---------------------------------------------------------------------------
+
+export function eligibleForAds(
+  route: AdRoute,
+  device: AdDevice,
+  aggression: AdAggression,
+): { allowed: boolean; reason?: string } {
   if (!AD_SETTINGS.enabled) return { allowed: false, reason: "ads_disabled" };
   if (device === "mobile" && !AD_SETTINGS.mobileEnabled) return { allowed: false, reason: "mobile_disabled" };
   if (device === "tablet" && !AD_SETTINGS.tabletEnabled) return { allowed: false, reason: "tablet_disabled" };
@@ -41,7 +66,15 @@ export function eligibleForAds(route: AdRoute, device: AdDevice, aggression: AdA
   return { allowed: true };
 }
 
-export async function loadPlacementAd(placement: AdPlacementName, route: AdRoute, device = detectAdDevice()): Promise<AdLoadResult> {
+// ---------------------------------------------------------------------------
+// Placement ad loading (script-based zones e.g. zone11137945)
+// ---------------------------------------------------------------------------
+
+export async function loadPlacementAd(
+  placement: AdPlacementName,
+  route: AdRoute,
+  device = detectAdDevice(),
+): Promise<AdLoadResult> {
   const allowed = eligibleForAds(route, device, "normal");
   if (!allowed.allowed) {
     trackEvent("ad_blocked", { ad_placement: placement, reason: allowed.reason ?? "blocked", device_category: device });
@@ -53,11 +86,24 @@ export async function loadPlacementAd(placement: AdPlacementName, route: AdRoute
     return { loaded: false, reason: "no_zone" };
   }
 
-  trackEvent("ad_eligible", { ad_zone: zone.id, ad_placement: placement, ad_format: zone.format, device_category: device });
+  trackEvent("ad_requested", {
+    ad_zone: zone.id,
+    ad_placement: placement,
+    ad_format: zone.format,
+    device_category: device,
+  });
   return loadScriptZone(zone, placement);
 }
 
-export async function requestAggressiveAd(route: AdRoute, reason: string, device = detectAdDevice()): Promise<AdLoadResult> {
+// ---------------------------------------------------------------------------
+// Aggressive ad request
+// ---------------------------------------------------------------------------
+
+export async function requestAggressiveAd(
+  route: AdRoute,
+  reason: string,
+  device = detectAdDevice(),
+): Promise<AdLoadResult> {
   const allowed = eligibleForAds(route, device, "aggressive");
   if (!allowed.allowed) {
     trackEvent("ad_blocked", { reason: allowed.reason ?? "blocked", ad_placement: reason, device_category: device });
@@ -71,21 +117,136 @@ export async function requestAggressiveAd(route: AdRoute, reason: string, device
 
   const frequency = canRequestAggressive(zone.format);
   if (!frequency.allowed) {
-    trackEvent("ad_blocked", { ad_zone: zone.id, reason: frequency.reason ?? "frequency", ad_placement: reason, device_category: device });
+    trackEvent("ad_blocked", {
+      ad_zone: zone.id,
+      reason: frequency.reason ?? "frequency",
+      ad_placement: reason,
+      device_category: device,
+    });
     return { loaded: false, reason: frequency.reason };
   }
 
   markAggressiveRequested(zone.format);
-  trackEvent("ad_eligible", { ad_zone: zone.id, ad_placement: reason, ad_format: zone.format, device_category: device });
+  trackEvent("aggressive_ad_triggered", {
+    ad_zone: zone.id,
+    ad_placement: reason,
+    ad_format: zone.format,
+    device_category: device,
+  });
 
   if (zone.format === "direct-link" && zone.directUrl) {
     const opened = window.open(zone.directUrl, "_blank", "noopener,noreferrer");
-    trackEvent(opened ? "ad_loaded" : "ad_failed", { ad_zone: zone.id, ad_placement: reason, ad_format: zone.format, device_category: device });
+    trackEvent(opened ? "ad_loaded" : "ad_failed", {
+      ad_zone: zone.id,
+      ad_placement: reason,
+      ad_format: zone.format,
+      device_category: device,
+    });
     return { loaded: Boolean(opened), zone, reason: opened ? undefined : "popup_blocked" };
   }
 
   return loadScriptZone(zone, reason);
 }
+
+// ---------------------------------------------------------------------------
+// effectivecpmnetwork supplemental scripts (pl30892961, pl30892962)
+// These are loaded once globally — not tied to specific placements.
+// ---------------------------------------------------------------------------
+
+export function loadEcpmSupplementalScripts(): void {
+  if (!AD_SETTINGS.enabled || !AD_SETTINGS.normalEnabled) return;
+  if (typeof document === "undefined") return;
+
+  for (const entry of Object.values(ECPM_SCRIPTS)) {
+    if (!entry.enabled) continue;
+    if (document.getElementById(entry.id)) continue; // already loaded
+
+    const script = document.createElement("script");
+    script.id = entry.id;
+    script.src = entry.src;
+    script.async = true;
+    script.setAttribute("data-rifitv-ad-zone", entry.id);
+    document.body.appendChild(script);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Native ad loading
+// ---------------------------------------------------------------------------
+
+export function loadNativeAd(targetContainerId: string): Promise<{ loaded: boolean; reason?: string }> {
+  if (!AD_SETTINGS.enabled || !AD_SETTINGS.normalEnabled || !NATIVE_AD.enabled) {
+    return Promise.resolve({ loaded: false, reason: "disabled" });
+  }
+  if (typeof document === "undefined") {
+    return Promise.resolve({ loaded: false, reason: "ssr" });
+  }
+
+  const container = document.getElementById(targetContainerId);
+  if (!container) {
+    return Promise.resolve({ loaded: false, reason: "container_missing" });
+  }
+
+  const scriptId = `${NATIVE_AD.scriptId}_${targetContainerId}`;
+  if (document.getElementById(scriptId)) {
+    return Promise.resolve({ loaded: false, reason: "deduped" });
+  }
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const timeoutId = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      trackEvent("ad_failed", { ad_zone: "native_ecpm", reason: "timeout", ad_format: "native" });
+      resolve({ loaded: false, reason: "timeout" });
+    }, AD_SETTINGS.bannerTimeoutMs);
+
+    const script = document.createElement("script");
+    script.id = scriptId;
+    script.src = NATIVE_AD.invokeUrl;
+    script.async = true;
+    script.setAttribute("data-rifitv-ad-zone", scriptId);
+
+    script.onload = () => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeoutId);
+      trackEvent("ad_loaded", { ad_zone: "native_ecpm", ad_format: "native" });
+      resolve({ loaded: true });
+    };
+
+    script.onerror = () => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeoutId);
+      trackEvent("ad_failed", { ad_zone: "native_ecpm", reason: "script_error", ad_format: "native" });
+      resolve({ loaded: false, reason: "script_error" });
+    };
+
+    container.appendChild(script);
+    trackEvent("ad_requested", { ad_zone: "native_ecpm", ad_format: "native" });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Smart banner zone selection by device + size preference
+// ---------------------------------------------------------------------------
+
+export function getBestBannerZone(device: AdDevice, preferredSizes: string[]): BannerZone | null {
+  if (!AD_SETTINGS.enabled || !AD_SETTINGS.normalEnabled) return null;
+
+  for (const key of preferredSizes) {
+    const zone = HPF_BANNER_ZONES[key];
+    if (!zone?.enabled) continue;
+    if (!zone.devices.includes(device)) continue;
+    return zone;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
 
 function chooseZone(keys: string[], device: AdDevice, aggression: AdAggression): AdZone | null {
   const candidates = keys
@@ -108,7 +269,7 @@ function chooseZone(keys: string[], device: AdDevice, aggression: AdAggression):
     }
   }
 
-  return candidates[0];
+  return candidates[0] ?? null;
 }
 
 function zoneRegistry(): Set<string> {
@@ -127,7 +288,11 @@ function loadScriptZone(zone: AdZone, placement: string): Promise<AdLoadResult> 
   const src = zone.src;
 
   const registry = zoneRegistry();
-  if (registry.has(zone.id) || loadedZones.has(zone.id) || document.querySelector(`[data-rifitv-ad-zone="${zone.id}"]`)) {
+  if (
+    registry.has(zone.id) ||
+    loadedZones.has(zone.id) ||
+    document.querySelector(`[data-rifitv-ad-zone="${zone.id}"]`)
+  ) {
     trackEvent("ad_blocked", { ad_zone: zone.id, ad_placement: placement, reason: "deduped", ad_format: zone.format });
     return Promise.resolve({ loaded: false, zone, reason: "deduped" });
   }
@@ -165,7 +330,12 @@ function loadScriptZone(zone: AdZone, placement: string): Promise<AdLoadResult> 
       if (settled) return;
       settled = true;
       window.clearTimeout(timeout);
-      trackEvent("ad_failed", { ad_zone: zone.id, ad_placement: placement, reason: "script_error", ad_format: zone.format });
+      trackEvent("ad_failed", {
+        ad_zone: zone.id,
+        ad_placement: placement,
+        reason: "script_error",
+        ad_format: zone.format,
+      });
       resolve({ loaded: false, zone, reason: "script_error" });
     };
 

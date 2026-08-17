@@ -86,4 +86,28 @@ describe("AdManager", () => {
     expect(result.loaded).toBe(false);
     expect(result.reason).toBe("script_error");
   });
+
+  it("getBestBannerZone returns correct zone for device", async () => {
+    const manager = await loadManager();
+
+    const mobileZone = manager.getBestBannerZone("mobile", ["hpf_320x50"]);
+    expect(mobileZone?.key).toBe("hpf_320x50");
+    expect(mobileZone?.size).toEqual({ width: 320, height: 50 });
+
+    const desktopZone = manager.getBestBannerZone("desktop", ["hpf_728x90"]);
+    expect(desktopZone?.key).toBe("hpf_728x90");
+    expect(desktopZone?.size).toEqual({ width: 728, height: 90 });
+
+    // Mobile device should not get desktop-only zone
+    const noZone = manager.getBestBannerZone("mobile", ["hpf_728x90"]);
+    expect(noZone).toBeNull();
+  });
+
+  it("returns null from getBestBannerZone when ads disabled", async () => {
+    vi.resetModules();
+    vi.stubEnv("NEXT_PUBLIC_RIFITV_ADS_ENABLED", "false");
+    const manager = await import("./AdManager");
+    const zone = manager.getBestBannerZone("desktop", ["hpf_728x90"]);
+    expect(zone).toBeNull();
+  });
 });

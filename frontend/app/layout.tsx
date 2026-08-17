@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AnalyticsPageView } from "@/components/AnalyticsPageView";
 import { JsonLd } from "@/components/JsonLd";
+import { MobileStickyAd } from "@/components/ads/MobileStickyAd";
 import { RemoteNavigation } from "@/components/RemoteNavigation";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { ThemeScript } from "@/components/ThemeScript";
@@ -89,6 +90,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <RemoteNavigation />
         <ServiceWorkerRegistration />
         {children}
+        <MobileStickyAd />
       </body>
     </html>
   );

@@ -4,6 +4,7 @@ import { Maximize, Pause, Play, RotateCcw, Volume2, VolumeX } from "lucide-react
 import { useEffect, useMemo, useRef, useState } from "react";
 import { API_BASE } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
+import { PlayerMidrollOverlay } from "@/components/ads/PlayerMidrollOverlay";
 import type { PlaybackPayload, PlaybackSource } from "@/lib/types";
 import { PlaybackEngine } from "./PlaybackEngine";
 import type { PlaybackState, QualityLevel } from "./types";
@@ -101,6 +102,7 @@ export function PlayerUI({ playback, title }: { playback: PlaybackPayload; title
   }
 
   return (
+    <PlayerMidrollOverlay isPlaying={playing}>
     <div ref={shellRef} className="rifitv-player-shell overflow-hidden rounded-lg border border-white/10 bg-black" aria-label={`${title} player`}>
       <div className="rifitv-player-stage relative bg-black">
         <video
@@ -193,6 +195,7 @@ export function PlayerUI({ playback, title }: { playback: PlaybackPayload; title
         </IconButton>
       </div>
     </div>
+    </PlayerMidrollOverlay>
   );
 }
 
