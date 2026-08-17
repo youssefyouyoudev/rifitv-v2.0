@@ -733,7 +733,7 @@ function OperationsView({ alerts, queueHealth, detailedHealth, syncRuns, run, ad
   );
 }
 
-function MatchManager({ matches, teams, competitions, channels, run, adminGet, adminSend, openControl }: ManagerProps & { matches: Match[]; teams: Entity[]; competitions: Entity[]; channels: Entity[]; openControl: (matchId: number) => void }) {
+function MatchManager({ matches, teams, competitions, channels, run, adminGet, adminSend, openControl }: ManagerProps & { adminGet: <T>(path: string, signal?: AbortSignal) => Promise<T>; matches: Match[]; teams: Entity[]; competitions: Entity[]; channels: Entity[]; openControl: (matchId: number) => void }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -766,7 +766,6 @@ function MatchManager({ matches, teams, competitions, channels, run, adminGet, a
   }, [matches]);
 
   useEffect(() => {
-    if (!adminGet) return;
     const controller = new AbortController();
 
     async function loadMatches() {
@@ -1529,6 +1528,40 @@ function Empty({ message }: { message: string }) { return <p className="rounded-
 function Toast({ tone, message, onClose }: { tone: "success" | "error"; message: string; onClose: () => void }) { return <div className={`mb-4 flex items-center justify-between rounded-md border p-3 text-sm ${tone === "success" ? "border-green-500/30 bg-green-500/10 text-green-200" : "border-red-500/30 bg-red-500/10 text-red-200"}`}><span>{tone === "success" ? <Check className="mr-2 inline h-4 w-4" /> : null}{message}</span><button onClick={onClose}><X className="h-4 w-4" /></button></div>; }
 function groupBy<T extends Record<string, unknown>>(items: T[], key: keyof T): Record<string, T[]> { return items.reduce((groups, item) => { const value = String(item[key]); groups[value] ??= []; groups[value].push(item); return groups; }, {} as Record<string, T[]>); }
 function labelize(value: string): string { return value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()); }
+const adminDisplayTimezone = "Africa/Casablanca";
+const adminDateFormatter = new Intl.DateTimeFormat("en-GB", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  timeZone: adminDisplayTimezone,
+});
+const adminTimeFormatter = new Intl.DateTimeFormat("en-GB", {
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: adminDisplayTimezone,
+});
+function localTodayDate(): string { return localDateKey(new Date()); }
+function localDateKey(value: Date | string): string {
+  const date = typeof value === "string" ? new Date(value) : value;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: adminDisplayTimezone,
+  }).formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value ?? "0000";
+  const month = parts.find((part) => part.type === "month")?.value ?? "01";
+  const day = parts.find((part) => part.type === "day")?.value ?? "01";
+
+  return `${year}-${month}-${day}`;
+}
+function addDays(date: string, amount: number): string {
+  const [year, month, day] = date.split("-").map(Number);
+  if (!year || !month || !day) return localTodayDate();
+  const next = new Date(Date.UTC(year, month - 1, day + amount, 12, 0, 0));
+
+  return next.toISOString().slice(0, 10);
+}
 function localDateTime(): string { const date = new Date(Date.now() + 60 * 60 * 1000); date.setMinutes(0, 0, 0); return date.toISOString().slice(0, 16); }
 function apiErrorMessage(caught: unknown): string {
   if (!(caught instanceof ApiError)) {
