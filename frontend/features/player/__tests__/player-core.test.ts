@@ -13,12 +13,14 @@ const sources: PlaybackSource[] = [
 ];
 
 describe("player core", () => {
-  it("prevents impossible state transitions", () => {
+  it("allows connectivity loss but prevents impossible state transitions", () => {
     const machine = new PlaybackStateMachine();
     machine.transition("loading");
     machine.transition("ready");
+    machine.transition("offline");
 
-    expect(() => machine.transition("offline")).toThrow();
+    expect(machine.state()).toBe("offline");
+    expect(() => machine.transition("idle")).toThrow();
   });
 
   it("orders compatible healthy sources before unhealthy sources", () => {
@@ -38,6 +40,15 @@ describe("player core", () => {
       manager.markFailed(second.id);
     }
     expect(manager.select()).toBeNull();
+  });
+
+  it("allows an explicit retry to rehabilitate a failed source", () => {
+    const manager = new SourceManager(sources, new Set(["hls"]), 1);
+    manager.markFailed(2);
+    expect(manager.select()?.id).toBe(1);
+
+    manager.reset(2);
+    expect(manager.select()?.id).toBe(2);
   });
 
   it("switches source after recovery limits are exhausted", () => {

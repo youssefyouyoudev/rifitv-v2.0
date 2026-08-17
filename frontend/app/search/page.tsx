@@ -47,7 +47,15 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
                 </Link>
               ))}
             </ResultGroup>
-            {results.teams.length + results.matches.length + results.competitions.length === 0 ? <p className="text-sm text-[var(--muted)]">No public results found.</p> : null}
+            <ResultGroup title="TV channels">
+              {results.channels.map((channel) => (
+                <Link key={channel.id} href={`/matches?search=${encodeURIComponent(channel.name)}`} className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-4 text-[var(--foreground)] outline-none hover:bg-[var(--surface-muted)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]">
+                  <span className="font-semibold">{channel.name}</span>
+                  <span className="mt-1 block text-sm text-[var(--muted)]">{[channel.language, channel.quality_label].filter(Boolean).join(" - ") || "Assigned fixtures"}</span>
+                </Link>
+              ))}
+            </ResultGroup>
+            {results.teams.length + results.matches.length + results.competitions.length + results.channels.length === 0 ? <p className="text-sm text-[var(--muted)]">No public results found.</p> : null}
           </div>
         ) : null}
       </section>

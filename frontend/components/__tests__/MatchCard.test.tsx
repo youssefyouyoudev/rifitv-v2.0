@@ -47,6 +47,7 @@ describe("MatchCard", () => {
     expect(screen.getByText("Live now")).toBeInTheDocument();
     expect(screen.getByText("Watch Live")).toBeInTheDocument();
     expect(screen.getAllByText("1")).toHaveLength(2);
+    expect(screen.getByRole("link", { name: /Arsenal.*Chelsea.*Watch Live/i })).toHaveAttribute("href", "/match/arsenal-vs-chelsea-live");
   });
 
   it("renders scheduled matches without inferred live state", () => {

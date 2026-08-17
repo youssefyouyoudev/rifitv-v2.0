@@ -46,7 +46,8 @@ export default async function MatchPage({ params }: PageProps<"/match/[slug]">) 
     "@type": "SportsEvent",
     name: `${match.home_team.name} vs ${match.away_team.name}`,
     startDate: match.kickoff_at ?? match.scheduled_date,
-    eventStatus: match.status === "finished" ? "https://schema.org/EventCompleted" : match.status === "postponed" ? "https://schema.org/EventPostponed" : match.status === "cancelled" ? "https://schema.org/EventCancelled" : "https://schema.org/EventScheduled",
+    eventStatus: match.status === "finished" ? "https://schema.org/EventCompleted" : match.status === "postponed" ? "https://schema.org/EventPostponed" : match.status === "cancelled" ? "https://schema.org/EventCancelled" : match.status === "live" || match.status === "halftime" ? "https://schema.org/EventInProgress" : "https://schema.org/EventScheduled",
+    url: absoluteUrl(`/match/${match.slug}`),
     competitor: [
       { "@type": "SportsTeam", name: match.home_team.name },
       { "@type": "SportsTeam", name: match.away_team.name },
@@ -65,7 +66,7 @@ export default async function MatchPage({ params }: PageProps<"/match/[slug]">) 
         "@type": "BreadcrumbList",
         itemListElement: [
           { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
-          { "@type": "ListItem", position: 2, name: "Football", item: absoluteUrl("/football") },
+          { "@type": "ListItem", position: 2, name: "Matches", item: absoluteUrl("/matches") },
           { "@type": "ListItem", position: 3, name: `${match.home_team.name} vs ${match.away_team.name}`, item: absoluteUrl(`/match/${match.slug}`) },
         ],
       }} />
@@ -78,21 +79,16 @@ export default async function MatchPage({ params }: PageProps<"/match/[slug]">) 
         </div>
         <ShareButton title={`${match.home_team.name} vs ${match.away_team.name}`} text={`${match.home_team.name} vs ${match.away_team.name} - ${match.competition.name}`} url={absoluteUrl(`/match/${match.slug}`)} />
       </section>
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="match-layout">
         <section className="space-y-4">
           {canPlay ? (
             <PlayerUI playback={playback} title={`${match.home_team.name} vs ${match.away_team.name}`} />
           ) : (
             <PrematchPanel match={match} playback={playback} />
           )}
-          <div className="xl:hidden">
-            <LiveMatchSummary initialMatch={match} />
-          </div>
         </section>
         <aside className="space-y-4">
-          <div className="hidden xl:block">
-            <LiveMatchSummary initialMatch={match} />
-          </div>
+          <LiveMatchSummary initialMatch={match} />
           <BroadcastPanel match={match} playback={playback} />
           <MatchLinks match={match} />
         </aside>
@@ -133,7 +129,7 @@ function PrematchPanel({ match, playback }: { match: Match; playback: PlaybackPa
         : `Kickoff - ${formatClockTime(match.kickoff_at)}`;
 
   return (
-    <div className="grid min-h-[420px] place-items-center rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6 text-center">
+    <div className="grid min-h-72 place-items-center rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5 text-center sm:min-h-[420px] sm:p-6">
       <div className="mx-auto max-w-xl space-y-5">
         <div className="mx-auto flex w-fit items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-xs font-semibold uppercase text-[var(--muted)]">
           <CompetitionLogo competition={match.competition} />
@@ -145,7 +141,7 @@ function PrematchPanel({ match, playback }: { match: Match; playback: PlaybackPa
           <PanelTeam team={match.away_team} />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-[var(--foreground)]">{title}</h1>
+          <h2 className="text-2xl font-bold text-[var(--foreground)]">{title}</h2>
           <p className="mt-2 text-sm text-[var(--muted)]">{subtitle}</p>
         </div>
         {status === "locked" || status === "opening_soon" ? (
@@ -172,9 +168,11 @@ function PanelTeam({ team }: { team: Match["home_team"] }) {
 }
 
 function BroadcastPanel({ match, playback }: { match: Match; playback: PlaybackPayload }) {
+  const hasBroadcasts = (match.broadcasts?.length ?? 0) > 0 || playback.sources.length > 0;
+
   return (
     <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
-      <h2 className="text-sm font-semibold uppercase tracking-normal text-[var(--muted)]">Broadcast</h2>
+      <h2 className="text-sm font-semibold uppercase tracking-normal text-[var(--muted)]">Available broadcasts</h2>
       <div className="mt-4 space-y-3">
         {match.broadcasts?.map((broadcast) => (
           <div key={broadcast.id} className="rounded-md border border-[var(--border)] bg-[var(--surface-muted)] p-3">
@@ -189,11 +187,12 @@ function BroadcastPanel({ match, playback }: { match: Match; playback: PlaybackP
           <div key={source.id} className="rounded-md border border-[var(--border)] bg-[var(--surface-muted)] p-3">
             <div className="flex items-center justify-between gap-3">
               <span className="font-medium text-[var(--foreground)]">{source.channel_name}</span>
-              <span className="text-xs uppercase text-[var(--muted)]">{source.protocol}</span>
+              <span className="text-xs uppercase text-[var(--muted)]">{source.quality ?? source.protocol}</span>
             </div>
             <p className="mt-1 text-sm text-[var(--muted)]">{source.name}{source.is_backup ? " backup" : ""}</p>
           </div>
         ))}
+        {!hasBroadcasts ? <p className="text-sm text-[var(--muted)]">No authorized broadcast has been assigned yet.</p> : null}
       </div>
     </div>
   );

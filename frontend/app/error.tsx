@@ -2,7 +2,7 @@
 
 export default function ErrorPage({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
-    <main className="grid min-h-screen place-items-center bg-neutral-950 p-6 text-neutral-100">
+    <main className="grid min-h-dvh place-items-center bg-neutral-950 p-6 text-neutral-100">
       <section className="max-w-md text-center">
         <p className="text-sm font-semibold uppercase tracking-normal text-red-300">Error</p>
         <h1 className="mt-2 text-3xl font-black text-white">RiFiTV hit a problem</h1>

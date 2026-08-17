@@ -50,6 +50,10 @@ export class SourceManager {
     this.failures.set(sourceId, (this.failures.get(sourceId) ?? 0) + 1);
   }
 
+  reset(sourceId: number): void {
+    this.failures.delete(sourceId);
+  }
+
   hasExhausted(sourceId: number): boolean {
     return (this.failures.get(sourceId) ?? 0) >= this.maxFailuresPerSource;
   }

@@ -25,10 +25,10 @@ export async function generateMetadata({ searchParams }: PageProps<"/matches">):
 }
 
 const statusFilters = [
-  { label: "All", value: undefined },
-  { label: "Today", value: undefined },
-  { label: "Upcoming", value: "scheduled" },
-  { label: "Results", value: "finished" },
+  { label: "All", value: undefined, href: undefined },
+  { label: "Today", value: undefined, href: "/matches/today" },
+  { label: "Upcoming", value: "scheduled", href: undefined },
+  { label: "Results", value: "finished", href: undefined },
 ];
 
 export default async function MatchesPage({ searchParams }: PageProps<"/matches">) {
@@ -65,6 +65,14 @@ export default async function MatchesPage({ searchParams }: PageProps<"/matches"
         </form>
         <div className="flex flex-wrap gap-2">
           {statusFilters.map((filter) => {
+            if (filter.href) {
+              return (
+                <Link key={filter.label} href={filter.href} className="inline-flex h-9 items-center rounded-md border border-[var(--border)] px-3 text-sm font-semibold text-[var(--foreground)] hover:bg-[var(--surface-muted)]">
+                  {filter.label}
+                </Link>
+              );
+            }
+
             const nextParams = new URLSearchParams();
             if (filter.value) nextParams.set("status", filter.value);
             if (competition) nextParams.set("competition", competition);

@@ -1,6 +1,6 @@
 export default function OfflinePage() {
   return (
-    <main className="grid min-h-screen place-items-center bg-neutral-950 p-6 text-neutral-100">
+    <main className="grid min-h-dvh place-items-center bg-neutral-950 p-6 text-neutral-100">
       <section className="max-w-md text-center">
         <p className="text-sm font-semibold uppercase tracking-normal text-red-300">Offline</p>
         <h1 className="mt-2 text-3xl font-black text-white">You are offline</h1>

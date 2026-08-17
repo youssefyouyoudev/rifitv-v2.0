@@ -1,9 +1,13 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { AppShell } from "@/components/AppShell";
+import { CompetitionLogo } from "@/components/CompetitionLogo";
+import { Countdown } from "@/components/Countdown";
 import { MatchCard } from "@/components/MatchCard";
+import { TeamMark } from "@/components/TeamMark";
 import { absoluteUrl, SITE_NAME } from "@/lib/site";
 import { getHome } from "@/lib/api";
+import { formatClockTime, formatMatchDateLabel } from "@/lib/time";
 import type { Match } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -58,7 +62,7 @@ export default async function Home() {
           </div>
         </section>
 
-        <HomeSignal match={live[0] ?? scheduled[0] ?? home.next_match} live={live.length > 0} />
+        <HomeSignal match={live[0] ?? scheduled[0] ?? home.next_match} live={live.length > 0} serverDate={home.date} />
 
         <div className="flex gap-2 overflow-x-auto pb-1">
           <span className="inline-flex h-9 shrink-0 items-center rounded-md bg-[var(--brand-blue)] px-3 text-sm font-semibold text-white">All</span>
@@ -86,26 +90,59 @@ export default async function Home() {
   );
 }
 
-function HomeSignal({ match, live }: { match: Match | null | undefined; live: boolean }) {
+function HomeSignal({ match, live, serverDate }: { match: Match | null | undefined; live: boolean; serverDate: string }) {
   if (!match) {
-    return <section className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5 text-sm text-[var(--muted)]">No upcoming broadcast is available yet. Browse the full schedule for the latest fixtures.</section>;
+    return <section className="border-y border-[var(--border)] py-6 text-sm text-[var(--muted)]">No upcoming broadcast is available yet. Browse the full schedule for the latest fixtures.</section>;
   }
 
+  const countdown = match.playback_window.status === "locked" || match.playback_window.status === "opening_soon"
+    ? match.playback_window.seconds_until_open
+    : match.playback_window.seconds_until_kickoff;
+
   return (
-    <section className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-[var(--live)]/25 bg-[var(--surface)] p-5">
-      <div>
-        <p className={`text-xs font-semibold uppercase ${live ? "text-[var(--live)]" : "text-[var(--muted)]"}`}>{live ? "Live now" : "Next match"}</p>
-        <h2 className="mt-1 text-xl font-bold text-[var(--foreground)]">{match.home_team.name} vs {match.away_team.name}</h2>
-        <p className="mt-1 text-sm text-[var(--muted)]">{match.competition.name} - {match.status_label ?? "Scheduled"}</p>
+    <section className="grid gap-5 border-y border-[var(--live)]/25 bg-[var(--surface)]/50 py-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center" aria-labelledby="home-signal-title">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase text-[var(--muted)]">
+          <CompetitionLogo competition={match.competition} />
+          <span className="truncate">{match.competition.name}</span>
+        </div>
+        <p className={`mt-3 text-xs font-semibold uppercase ${live ? "text-[var(--live)]" : "text-[var(--brand-blue)]"}`}>{live ? "Live now" : "Next match"}</p>
+        <div className="mt-3 grid max-w-2xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 sm:gap-5">
+          <SignalTeam team={match.home_team} />
+          <div className="text-center">
+            <span className="block text-xl font-black tabular-nums text-[var(--foreground)]">{live && match.home_score !== null ? `${match.home_score}-${match.away_score ?? 0}` : formatClockTime(match.kickoff_at)}</span>
+            <span className="mt-1 block text-xs font-semibold uppercase text-[var(--muted)]">{live ? match.status_label ?? "Live" : "Morocco time"}</span>
+          </div>
+          <SignalTeam team={match.away_team} align="right" />
+        </div>
       </div>
-      <Link href={`/match/${match.slug}`} className="inline-flex min-h-10 items-center rounded-md bg-[var(--brand-blue)] px-4 text-sm font-semibold text-white">{live ? "Watch live" : "View match"}</Link>
+      <div className="flex min-w-52 flex-col items-start gap-3 lg:items-end">
+        <div>
+          <h2 id="home-signal-title" className="text-sm font-semibold text-[var(--foreground)]">{match.home_team.name} vs {match.away_team.name}</h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">{formatMatchDateLabel(match, serverDate)}</p>
+          {match.channels.length > 0 ? <p className="mt-1 max-w-xs truncate text-xs text-[var(--muted)]">TV: {match.channels.map((channel) => channel.name).join(", ")}</p> : null}
+        </div>
+        {!live && countdown !== null ? <Countdown seconds={countdown} label={match.playback_window.status === "locked" ? "Broadcast opens in" : "Starts in"} compact /> : null}
+        <Link href={`/match/${match.slug}`} className="inline-flex min-h-11 items-center rounded-md bg-[var(--brand-blue)] px-4 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]">{live ? "Watch live" : "View match"}</Link>
+      </div>
     </section>
+  );
+}
+
+function SignalTeam({ team, align = "left" }: { team: Match["home_team"]; align?: "left" | "right" }) {
+  return (
+    <div className={`min-w-0 text-center ${align === "right" ? "sm:text-right" : "sm:text-left"}`}>
+      <div className={`flex flex-col items-center gap-2 sm:flex-row ${align === "right" ? "sm:flex-row-reverse" : ""}`}>
+        <TeamMark team={team} size="lg" />
+        <span className="min-w-0 break-words text-xs font-bold leading-tight text-[var(--foreground)] sm:truncate sm:text-base">{team.name}</span>
+      </div>
+    </div>
   );
 }
 
 function NoMatchesToday({ nextMatch, serverDate }: { nextMatch: Match | null; serverDate: string }) {
   return (
-    <section className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6">
+    <section className="border-y border-[var(--border)] py-6">
       <h2 className="text-xl font-semibold text-[var(--foreground)]">No matches today</h2>
       <p className="mt-2 text-sm text-[var(--muted)]">No RiFiTV fixtures are scheduled for today.</p>
       {nextMatch ? (

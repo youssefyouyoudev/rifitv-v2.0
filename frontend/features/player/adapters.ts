@@ -132,6 +132,7 @@ class HlsAdapter implements PlaybackAdapter {
 
   destroy(): void {
     if (this.video) {
+      clearVideoEvents(this.video);
       this.video.removeAttribute("src");
       this.video.load();
     }
@@ -219,6 +220,7 @@ class MpegTsAdapter implements PlaybackAdapter {
     this.player?.detachMediaElement();
     this.player?.destroy();
     if (this.video) {
+      clearVideoEvents(this.video);
       this.video.removeAttribute("src");
       this.video.load();
     }
@@ -233,6 +235,14 @@ class MpegTsAdapter implements PlaybackAdapter {
     video.onended = () => this.events.onEnded();
     video.onerror = () => this.events.onIssue({ kind: "media", fatal: true, message: "Video playback error" });
   }
+}
+
+function clearVideoEvents(video: HTMLVideoElement): void {
+  video.oncanplay = null;
+  video.onplaying = null;
+  video.onwaiting = null;
+  video.onended = null;
+  video.onerror = null;
 }
 
 async function loadHls(): Promise<HlsConstructor> {

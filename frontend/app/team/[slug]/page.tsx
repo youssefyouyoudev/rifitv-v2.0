@@ -40,11 +40,11 @@ export default async function TeamPage({ params }: PageProps<"/team/[slug]">) {
       }} />
       <JsonLd id={`team-${payload.team.id}`} data={{ "@context": "https://schema.org", "@type": "SportsTeam", name: payload.team.name, url: absoluteUrl(`/team/${payload.team.slug}`) }} />
       <div className="space-y-6">
-        <section className="flex items-center gap-4 rounded-lg border border-white/10 bg-neutral-900 p-5">
+        <section className="flex items-center gap-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
           <TeamMark team={payload.team} size="lg" />
           <div>
-            <h1 className="text-2xl font-bold text-white">{payload.team.name}</h1>
-            <p className="text-sm text-neutral-400">{payload.team.country_code ?? "Featured club"}</p>
+            <h1 className="text-2xl font-bold text-[var(--foreground)]">{payload.team.name}</h1>
+            <p className="text-sm text-[var(--muted)]">{payload.team.country_code ?? "Featured club"}</p>
           </div>
         </section>
         <MatchSection title="Live" matches={payload.live} />

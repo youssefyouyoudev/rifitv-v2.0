@@ -14,18 +14,31 @@ export function Countdown({ seconds, label, compact = false }: Props) {
 
   useEffect(() => {
     if (seconds === null || seconds <= 0) {
-      return;
+      const reset = window.setTimeout(() => setRemaining(seconds), 0);
+      return () => window.clearTimeout(reset);
     }
 
-    const timer = window.setInterval(() => {
-      setRemaining((current) => (current === null ? null : Math.max(0, current - 1)));
-    }, 1000);
+    const deadline = performance.now() + seconds * 1000;
+    const update = (): void => {
+      setRemaining(Math.max(0, Math.ceil((deadline - performance.now()) / 1000)));
+    };
+    const timer = window.setInterval(update, 1000);
+    const visibilityHandler = (): void => {
+      if (document.visibilityState === "visible") {
+        update();
+      }
+    };
 
-    return () => window.clearInterval(timer);
+    document.addEventListener("visibilitychange", visibilityHandler);
+
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", visibilityHandler);
+    };
   }, [seconds]);
 
   return (
-    <span className={compact ? "inline-flex items-center gap-1" : "block"}>
+    <span className={compact ? "inline-flex items-center gap-1" : "block"} role="timer" aria-label={`${label} ${formatCountdown(remaining)}`}>
       <span className="text-[11px] font-semibold uppercase tracking-normal text-[var(--muted)]">{label}</span>
       <span className={`${compact ? "text-sm" : "mt-1 block text-lg"} font-semibold tabular-nums text-[var(--foreground)]`}>
         {formatCountdown(remaining)}

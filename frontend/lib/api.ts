@@ -98,11 +98,12 @@ export async function apiFetch<T>(path: string, options: ApiRequestOptions = {})
   }
 }
 
-async function apiGet<T>(path: string): Promise<T> {
+async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     headers: { Accept: "application/json" },
     cache: "no-store",
     credentials: "include",
+    signal,
   });
 
   if (!response.ok) {
@@ -146,7 +147,18 @@ async function getMatchesPage(status?: string, competition?: string, date?: stri
 }
 
 export async function getMatches(status?: string, competition?: string, date?: string, search?: string, territory?: string): Promise<Match[]> {
-  return (await getMatchesPage(status, competition, date, search, territory)).data;
+  const firstPage = await getMatchesPage(status, competition, date, search, territory);
+  const lastPage = firstPage.meta?.last_page ?? 1;
+
+  if (lastPage <= 1) {
+    return firstPage.data;
+  }
+
+  const remainingPages = await Promise.all(
+    Array.from({ length: lastPage - 1 }, (_, index) => getMatchesPage(status, competition, date, search, territory, index + 2)),
+  );
+
+  return [firstPage, ...remainingPages].flatMap((page) => page.data);
 }
 
 export async function getAllMatchesForSitemap(): Promise<Match[]> {
@@ -164,8 +176,8 @@ export async function getAllMatchesForSitemap(): Promise<Match[]> {
   return [firstPage, ...remainingPages].flatMap((page) => page.data);
 }
 
-export async function getMatch(slug: string): Promise<Match> {
-  return (await apiGet<ApiEnvelope<Match>>(`/matches/${slug}`)).data;
+export async function getMatch(slug: string, signal?: AbortSignal): Promise<Match> {
+  return (await apiGet<ApiEnvelope<Match>>(`/matches/${slug}`, signal)).data;
 }
 
 export async function getPlayback(slug: string): Promise<PlaybackPayload> {

@@ -59,6 +59,17 @@ it('returns an optimized home payload', function (): void {
         ]);
 });
 
+it('keeps the homepage count consistent with the dated public schedule', function (): void {
+    publicApiFixture();
+
+    $home = $this->getJson('/api/v1/home')->assertOk();
+    $date = $home->json('data.date');
+    $todayCount = $home->json('data.today_count');
+    $schedule = $this->getJson("/api/v1/matches?date={$date}&per_page=50")->assertOk();
+
+    expect($schedule->json('meta.total'))->toBe($todayCount);
+});
+
 it('lists and shows matches with relationships', function (): void {
     $slug = 'arsenal-vs-chelsea-live';
     publicApiFixture($slug);
@@ -156,4 +167,25 @@ it('keeps pending imported fixtures private while allowing explicitly published 
         ->assertOk()
         ->assertJsonFragment(['slug' => $manual->slug])
         ->assertJsonMissing(['slug' => $imported->slug]);
+});
+
+it('searches active public channels without exposing source credentials', function (): void {
+    Channel::factory()->create([
+        'name' => 'RiFiTV Sports HD',
+        'slug' => 'rifitv-sports-hd',
+        'language' => 'Arabic',
+        'quality_label' => 'HD',
+        'active' => true,
+    ]);
+    StreamSource::factory()->create([
+        'channel_id' => Channel::query()->where('slug', 'rifitv-sports-hd')->value('id'),
+        'url' => 'https://provider.example/secret-stream.m3u8',
+    ]);
+
+    $this->getJson('/api/v1/search?q=Sports')
+        ->assertOk()
+        ->assertJsonPath('data.channels.0.name', 'RiFiTV Sports HD')
+        ->assertJsonPath('data.channels.0.quality_label', 'HD')
+        ->assertJsonMissing(['url' => 'https://provider.example/secret-stream.m3u8'])
+        ->assertJsonMissingPath('data.channels.0.playlist_id');
 });

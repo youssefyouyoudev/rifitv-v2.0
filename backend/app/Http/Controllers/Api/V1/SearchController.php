@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\CompetitionResource;
 use App\Http\Resources\MatchResource;
+use App\Http\Resources\PublicChannelResource;
 use App\Http\Resources\TeamResource;
+use App\Models\Channel;
 use App\Models\Competition;
 use App\Models\GameMatch;
 use App\Models\Team;
@@ -46,6 +48,16 @@ class SearchController extends Controller
                 ->where('active', true)
                 ->where(fn ($builder) => $builder->where('name', 'like', "%{$query}%")->orWhere('short_name', 'like', "%{$query}%"))
                 ->orderBy('sort_order')
+                ->limit(8)
+                ->get()),
+            'channels' => PublicChannelResource::collection(Channel::query()
+                ->where('active', true)
+                ->where(fn ($builder) => $builder
+                    ->where('name', 'like', "%{$query}%")
+                    ->orWhere('canonical_name', 'like', "%{$query}%")
+                    ->orWhere('language', 'like', "%{$query}%"))
+                ->orderBy('sort_order')
+                ->orderBy('name')
                 ->limit(8)
                 ->get()),
         ]]);

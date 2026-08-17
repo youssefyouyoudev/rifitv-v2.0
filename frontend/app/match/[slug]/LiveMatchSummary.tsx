@@ -11,23 +11,66 @@ export function LiveMatchSummary({ initialMatch }: { initialMatch: Match }) {
   const [match, setMatch] = useState(initialMatch);
 
   useEffect(() => {
-    const timer = window.setInterval(async () => {
+    let disposed = false;
+    let timer: number | null = null;
+    let controller: AbortController | null = null;
+    let latest = initialMatch;
+
+    const schedule = (): void => {
+      if (disposed || isTerminal(latest.status)) {
+        return;
+      }
+
+      const delay = document.visibilityState === "hidden" ? 60000 : isLive(latest.status) ? 10000 : 30000;
+      timer = window.setTimeout(() => void refresh(), delay);
+    };
+
+    const refresh = async (): Promise<void> => {
+      controller?.abort();
+      controller = new AbortController();
       try {
-        setMatch(await getMatch(initialMatch.slug));
+        const next = await getMatch(initialMatch.slug, controller.signal);
+        if (!disposed) {
+          latest = next;
+          setMatch(next);
+        }
       } catch {
         // Keep the last known score if a polling request fails.
+      } finally {
+        schedule();
       }
-    }, 10000);
+    };
 
-    return () => window.clearInterval(timer);
-  }, [initialMatch.slug]);
+    const handleVisibility = (): void => {
+      if (timer !== null) {
+        window.clearTimeout(timer);
+        timer = null;
+      }
+
+      if (document.visibilityState === "visible") {
+        void refresh();
+      } else {
+        schedule();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    schedule();
+
+    return () => {
+      disposed = true;
+      controller?.abort();
+      if (timer !== null) window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [initialMatch]);
 
   return (
     <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-sm text-[var(--muted)]">{match.competition.name}</p>
-          <h1 className="mt-1 text-xl font-bold text-[var(--foreground)]">{match.home_team.name} vs {match.away_team.name}</h1>
+          <h2 className="mt-1 text-xl font-bold text-[var(--foreground)]">{match.home_team.name} vs {match.away_team.name}</h2>
         </div>
         <StatusBadge status={match.status} />
       </div>
@@ -42,6 +85,14 @@ export function LiveMatchSummary({ initialMatch }: { initialMatch: Match }) {
       </div>
     </div>
   );
+}
+
+function isLive(status: Match["status"]): boolean {
+  return status === "live" || status === "halftime";
+}
+
+function isTerminal(status: Match["status"]): boolean {
+  return status === "finished" || status === "cancelled";
 }
 
 function TeamBlock({ team, score, showScore }: { team: Match["home_team"]; score: number | null; showScore: boolean }) {

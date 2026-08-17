@@ -1,4 +1,4 @@
-import { CalendarDays, Home, List, Radio, Search, Trophy } from "lucide-react";
+import { Home, List, Radio, Search, Trophy } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { RiFiTVLogo } from "./RiFiTVLogo";
@@ -7,21 +7,21 @@ import { ThemeToggle } from "./ThemeToggle";
 const nav = [
   { href: "/", label: "Home", icon: Home },
   { href: "/live", label: "Live", icon: Radio },
-  { href: "/matches/today", label: "Today", icon: CalendarDays },
   { href: "/matches", label: "Matches", icon: List },
   { href: "/competitions", label: "Competitions", icon: Trophy },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
-      <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--background)]/95 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-[1360px] items-center gap-5 px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="inline-flex items-center outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]" aria-label="RiFiTV home">
+    <div className="flex min-h-dvh flex-col bg-[var(--background)] text-[var(--foreground)]">
+      <a href="#main-content" className="skip-link" data-remote-skip>Skip to content</a>
+      <header className="app-header sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--background)]/95 backdrop-blur">
+        <div className="site-container flex h-16 items-center gap-3 sm:gap-5">
+          <Link href="/" className="inline-flex items-center outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]" aria-label="RiFiTV home" data-remote-start>
             <RiFiTVLogo priority className="[&_.theme-logo-dark]:h-9 [&_.theme-logo-light]:h-9" />
           </Link>
           <nav className="hidden items-center gap-1 md:flex" aria-label="Primary">
-            {nav.slice(1).map((item) => (
+            {nav.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -31,19 +31,29 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Link>
             ))}
           </nav>
-          <form action="/search" className="ml-auto hidden h-10 w-44 items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--muted)] md:flex lg:w-56">
+          <form action="/search" className="ml-auto hidden h-11 w-44 items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--muted)] md:flex lg:w-56">
             <Search className="h-4 w-4" aria-hidden="true" />
-            <input name="q" className="min-h-0 flex-1 bg-transparent text-[var(--foreground)] outline-none placeholder:text-[var(--muted)]" placeholder="Search" />
+            <label htmlFor="shell-search" className="sr-only">Search RiFiTV</label>
+            <input id="shell-search" name="q" type="search" className="min-h-0 min-w-0 flex-1 bg-transparent text-[var(--foreground)] outline-none placeholder:text-[var(--muted)]" placeholder="Search" />
           </form>
-          <Link href="/search" className="ml-auto grid h-10 w-10 place-items-center rounded-md border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] md:hidden" aria-label="Search">
+          <Link href="/search" className="ml-auto grid h-11 w-11 place-items-center rounded-md border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] md:hidden" aria-label="Search">
             <Search className="h-4 w-4" />
           </Link>
           <ThemeToggle />
         </div>
       </header>
-      <main className="mx-auto max-w-[1360px] px-4 pb-24 pt-5 sm:px-6 lg:px-8">{children}</main>
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-[var(--border)] bg-[var(--background)] md:hidden" aria-label="Mobile">
-        {[nav[0], nav[1], nav[3], nav[4]].map((item) => {
+      <main id="main-content" className="app-main site-container flex-1 pt-5">{children}</main>
+      <footer className="site-container hidden border-t border-[var(--border)] py-6 text-sm text-[var(--muted)] md:flex md:items-center md:justify-between">
+        <span>RiFiTV</span>
+        <nav className="flex items-center gap-5" aria-label="Footer">
+          <Link href="/matches">Matches</Link>
+          <Link href="/live">Live</Link>
+          <Link href="/competitions">Competitions</Link>
+          <Link href="/search">Search</Link>
+        </nav>
+      </footer>
+      <nav className="app-mobile-nav fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-[var(--border)] bg-[var(--background)] shadow-[0_-8px_24px_rgba(0,0,0,0.28)] md:hidden" aria-label="Mobile">
+        {nav.map((item) => {
           const Icon = item.icon;
 
           return (

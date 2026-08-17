@@ -30,7 +30,7 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={toggle}
-      className="inline-grid h-10 w-10 place-items-center rounded-md border border-[var(--border)] bg-[var(--surface-muted)] text-[var(--foreground)] outline-none transition hover:border-[var(--brand-cyan)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+      className="inline-grid h-11 w-11 place-items-center rounded-md border border-[var(--border)] bg-[var(--surface-muted)] text-[var(--foreground)] outline-none transition hover:border-[var(--brand-cyan)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
       aria-label="Toggle theme"
       title="Toggle theme"
     >

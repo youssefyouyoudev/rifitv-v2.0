@@ -38,6 +38,9 @@ export type Channel = {
   name: string;
   slug: string;
   logo_path: string | null;
+  country_code?: string | null;
+  language?: string | null;
+  quality_label?: string | null;
   active: boolean;
   sort_order: number;
 };
@@ -180,4 +183,5 @@ export type SearchPayload = {
   teams: Team[];
   matches: Match[];
   competitions: Competition[];
+  channels: Channel[];
 };

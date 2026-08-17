@@ -26,16 +26,17 @@ test("homepage loads today's production surface", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Today", exact: true })).toBeVisible();
   await expect(page.getByText("No matches today")).toBeVisible();
-  await expect(page.getByText("FC Barcelona").first()).toBeVisible();
-  await expect(page.getByText("Details").first()).toBeVisible();
+  await expect(page.getByText("Next match").first()).toBeVisible();
+  await expect(page.locator('a[href^="/match/"]').first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "View Matches" })).toBeVisible();
 });
 
 test("future match opens with prematch countdown and no source disclosure", async ({ page }) => {
   await page.goto("/match/arsenal-vs-coventry-city-premier-league-2026-27-pl-2026-27-001");
-  await expect(page.getByRole("heading", { name: "Arsenal vs Coventry City" })).toBeVisible();
-  await expect(page.getByText("Broadcast opens soon")).toBeVisible();
-  await expect(page.getByText("Broadcast opens in")).toBeVisible();
-  await expect(page.getByLabel("Broadcast source")).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 1, name: "Arsenal vs Coventry City" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Stream available soon" })).toBeVisible();
+  await expect(page.getByText("Stream available in")).toBeVisible();
+  await expect(page.getByLabel("Available broadcast sources")).toHaveCount(0);
   await expect(page.getByText("beIN SPORTS MENA")).toBeVisible();
   await expect(page.getByText("Channel assignment TBC")).toBeVisible();
 });

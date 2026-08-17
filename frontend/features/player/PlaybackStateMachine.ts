@@ -1,16 +1,16 @@
 import type { PlaybackState } from "./types";
 
 const transitions: Record<PlaybackState, PlaybackState[]> = {
-  idle: ["loading", "error"],
-  loading: ["ready", "playing", "buffering", "recovering", "switching_source", "offline", "error"],
-  ready: ["playing", "loading", "switching_source", "error"],
+  idle: ["loading", "offline", "error"],
+  loading: ["ready", "playing", "buffering", "recovering", "switching_source", "offline", "error", "ended"],
+  ready: ["playing", "loading", "recovering", "switching_source", "offline", "error", "ended"],
   playing: ["buffering", "recovering", "switching_source", "offline", "ended", "error", "ready"],
-  buffering: ["playing", "recovering", "switching_source", "offline", "error"],
-  recovering: ["playing", "buffering", "switching_source", "offline", "error"],
-  switching_source: ["loading", "playing", "offline", "error"],
-  offline: ["recovering", "loading", "error"],
-  error: ["loading", "recovering"],
-  ended: ["loading", "playing"],
+  buffering: ["ready", "playing", "recovering", "switching_source", "offline", "error", "ended"],
+  recovering: ["ready", "playing", "buffering", "switching_source", "offline", "error", "ended"],
+  switching_source: ["ready", "loading", "playing", "buffering", "recovering", "offline", "error", "ended"],
+  offline: ["recovering", "loading", "switching_source", "error"],
+  error: ["loading", "recovering", "switching_source"],
+  ended: ["loading", "playing", "switching_source"],
 };
 
 export class PlaybackStateMachine {
@@ -34,9 +34,4 @@ export class PlaybackStateMachine {
     return this.current;
   }
 
-  force(next: PlaybackState): PlaybackState {
-    this.current = next;
-
-    return this.current;
-  }
 }

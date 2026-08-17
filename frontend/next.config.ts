@@ -31,6 +31,17 @@ const nextConfig: NextConfig = {
     root: __dirname,
   },
 
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "www.rifitv.com" }],
+        destination: "https://rifitv.com/:path*",
+        permanent: true,
+      },
+    ];
+  },
+
   async headers() {
     if (process.env.NODE_ENV !== "production") {
       return [];

@@ -1,7 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AnalyticsPageView } from "@/components/AnalyticsPageView";
 import { JsonLd } from "@/components/JsonLd";
+import { RemoteNavigation } from "@/components/RemoteNavigation";
+import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { ThemeScript } from "@/components/ThemeScript";
 import { absoluteUrl, SITE_NAME, SITE_URL } from "@/lib/site";
 import "./globals.css";
@@ -47,6 +49,17 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  colorScheme: "dark light",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f7fbfd" },
+    { media: "(prefers-color-scheme: dark)", color: "#050910" },
+  ],
+};
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   const organizationJsonLd = {
     "@context": "https://schema.org",
@@ -73,6 +86,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <JsonLd id="rifitv-organization" data={organizationJsonLd} />
         <JsonLd id="rifitv-website" data={websiteJsonLd} />
         <AnalyticsPageView />
+        <RemoteNavigation />
+        <ServiceWorkerRegistration />
         {children}
       </body>
     </html>
