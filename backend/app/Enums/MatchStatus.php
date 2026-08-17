@@ -21,7 +21,7 @@ enum MatchStatus: string
         return match ($this) {
             self::Scheduled => 'Scheduled',
             self::Live => 'Live',
-            self::Halftime => 'Halftime',
+            self::Halftime => 'Half-time',
             self::Finished => 'Finished',
             self::Postponed => 'Postponed',
             self::Cancelled => 'Cancelled',

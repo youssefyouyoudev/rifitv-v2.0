@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { getAllMatchesForSitemap, getCompetitions } from "@/lib/api";
+import { getAllMatchesForSitemap, getCompetitions, getHome } from "@/lib/api";
 import { addDays, localTodayDate } from "@/lib/footballDate";
 import { absoluteUrl } from "@/lib/site";
 
@@ -8,7 +8,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     getAllMatchesForSitemap().catch(() => []),
     getCompetitions().catch(() => []),
   ]);
-  const today = localTodayDate();
+  const today = await getHome().then((home) => home.date).catch(() => localTodayDate());
   const tomorrow = addDays(today, 1);
   const teams = new Map<string, { slug: string; updatedAt?: string | null }>();
   matches.forEach((match) => {

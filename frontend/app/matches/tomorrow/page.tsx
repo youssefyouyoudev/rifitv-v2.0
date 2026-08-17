@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { FootballScheduleView } from "@/components/FootballScheduleView";
-import { getCompetitions, getMatches } from "@/lib/api";
-import { addDays, localTodayDate } from "@/lib/footballDate";
+import { getCompetitions, getHome, getMatches } from "@/lib/api";
+import { addDays } from "@/lib/footballDate";
 import { absoluteUrl, SITE_NAME } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
@@ -15,8 +15,9 @@ export const metadata: Metadata = {
 };
 
 export default async function TomorrowMatchesPage() {
-  const date = addDays(localTodayDate(), 1);
+  const home = await getHome();
+  const date = addDays(home.date, 1);
   const [matches, competitions] = await Promise.all([getMatches(undefined, undefined, date), getCompetitions()]);
 
-  return <FootballScheduleView title="Tomorrow's matches" description={`${date} - Africa/Casablanca`} matches={matches} competitions={competitions} serverDate={date} activeDate="tomorrow" canonicalPath="/matches/tomorrow" />;
+  return <FootballScheduleView title="Tomorrow's matches" description={`${date} - ${home.timezone}`} matches={matches} competitions={competitions} serverDate={date} activeDate="tomorrow" canonicalPath="/matches/tomorrow" />;
 }

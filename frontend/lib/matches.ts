@@ -4,7 +4,7 @@ import { addDays, localDateKey, localTodayDate, adminDateFormatter } from "./foo
 export const MATCH_STATUS_LABELS: Record<MatchStatus, string> = {
   scheduled: "Scheduled",
   live: "Live",
-  halftime: "Halftime",
+  halftime: "Half-time",
   finished: "Finished",
   postponed: "Postponed",
   cancelled: "Cancelled",

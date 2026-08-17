@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/AppShell";
 import { MatchSection } from "@/components/MatchSection";
 import { getHome, getMatches } from "@/lib/api";
+import { selectLaterToday, selectNextBroadcast } from "@/lib/liveSchedule";
 import { formatMatchKickoff } from "@/lib/time";
 import Link from "next/link";
 
@@ -8,8 +9,8 @@ export const dynamic = "force-dynamic";
 
 export default async function LivePage() {
   const [matches, home] = await Promise.all([getMatches("live"), getHome()]);
-  const nextMatch = home.next_match;
-  const remaining = home.matches.filter((match) => !matches.some((live) => live.id === match.id) && match.id !== nextMatch?.id);
+  const nextMatch = selectNextBroadcast(home, matches);
+  const remaining = selectLaterToday(home, matches, nextMatch);
 
   return (
     <AppShell>
@@ -24,12 +25,12 @@ export default async function LivePage() {
 
         {matches.length > 0 ? <MatchSection title="Live now" matches={matches} serverDate={home.date} /> : (
           <section className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6">
-            <h2 className="text-xl font-semibold text-[var(--foreground)]">No matches live right now</h2>
+            <h2 className="text-xl font-semibold text-[var(--foreground)]">Nothing live right now</h2>
             <p className="mt-2 text-sm text-[var(--muted)]">The next broadcast and today&apos;s schedule are ready below.</p>
             {nextMatch ? (
               <div className="mt-5 grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
                 <div>
-                  <p className="text-xs font-semibold uppercase text-[var(--muted)]">Next match</p>
+                  <p className="text-xs font-semibold uppercase text-[var(--muted)]">Next broadcast</p>
                   <h3 className="mt-1 text-xl font-bold text-[var(--foreground)]">{nextMatch.home_team.name} vs {nextMatch.away_team.name}</h3>
                   <p className="mt-1 text-sm text-[var(--muted)]">{nextMatch.competition.name} - {formatMatchKickoff(nextMatch)}</p>
                 </div>
@@ -38,7 +39,7 @@ export default async function LivePage() {
             ) : null}
           </section>
         )}
-        {remaining.length > 0 ? <MatchSection title="Today&apos;s remaining schedule" matches={remaining} serverDate={home.date} /> : null}
+        {remaining.length > 0 ? <MatchSection title="Later today" matches={remaining} serverDate={home.date} /> : null}
       </div>
     </AppShell>
   );
