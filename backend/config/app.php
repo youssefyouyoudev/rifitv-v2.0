@@ -67,8 +67,7 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
-
+ 'timezone' => env('APP_TIMEZONE', 'Africa/Casablanca'),
     /*
     |--------------------------------------------------------------------------
     | Application Locale Configuration
