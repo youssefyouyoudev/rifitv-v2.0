@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
+import { AdPlacement } from "@/components/AdPlacement";
 import { AppShell } from "@/components/AppShell";
 import { CompetitionLogo } from "@/components/CompetitionLogo";
 import { Countdown } from "@/components/Countdown";
 import { JsonLd } from "@/components/JsonLd";
 import { MatchPreferences } from "@/components/MatchPreferences";
 import { TeamMark } from "@/components/TeamMark";
-import { PlayerUI } from "@/features/player/PlayerUI";
+import { PreWatchAdGate } from "@/components/PreWatchAdGate";
 import { ShareButton } from "@/components/ShareButton";
 import { getMatch, getPlayback } from "@/lib/api";
 import { absoluteUrl, SITE_NAME } from "@/lib/site";
@@ -82,14 +83,16 @@ export default async function MatchPage({ params }: PageProps<"/match/[slug]">) 
       <div className="match-layout">
         <section className="space-y-4">
           {canPlay ? (
-            <PlayerUI playback={playback} title={`${match.home_team.name} vs ${match.away_team.name}`} />
+            <PreWatchAdGate playback={playback} title={`${match.home_team.name} vs ${match.away_team.name}`} />
           ) : (
             <PrematchPanel match={match} playback={playback} />
           )}
+          <AdPlacement name="match_below_player" />
         </section>
         <aside className="space-y-4">
           <LiveMatchSummary initialMatch={match} />
           <BroadcastPanel match={match} playback={playback} />
+          <AdPlacement name="match_sidebar" />
           <MatchLinks match={match} />
         </aside>
       </div>

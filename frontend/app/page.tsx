@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { AdPlacement } from "@/components/AdPlacement";
 import { AppShell } from "@/components/AppShell";
 import { CompetitionLogo } from "@/components/CompetitionLogo";
 import { Countdown } from "@/components/Countdown";
@@ -63,6 +64,7 @@ export default async function Home() {
         </section>
 
         <HomeSignal match={live[0] ?? scheduled[0] ?? home.next_match} live={live.length > 0} serverDate={home.date} />
+        <AdPlacement name="homepage_between_sections" />
 
         <div className="flex gap-2 overflow-x-auto pb-1">
           <span className="inline-flex h-9 shrink-0 items-center rounded-md bg-[var(--brand-blue)] px-3 text-sm font-semibold text-white">All</span>

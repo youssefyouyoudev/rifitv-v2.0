@@ -5,13 +5,15 @@ const apiBase =
   "http://127.0.0.1:8000/api/v1";
 
 const apiOrigin = new URL(apiBase).origin;
+const adScriptDomains = "https://quge5.com https://5gvci.com https://nap5k.com https://n6wxm.com";
+const adConnectDomains = `${adScriptDomains} https://omg10.com`;
 
 const cspHeader = `
   default-src 'self';
-  connect-src 'self' ${apiOrigin} https://rifitv.com https://www.rifitv.com https://cloudflareinsights.com;
+  connect-src 'self' ${apiOrigin} https://rifitv.com https://www.rifitv.com https://cloudflareinsights.com ${adConnectDomains};
   img-src 'self' data: https: blob:;
   media-src 'self' blob: https: http:;
-  script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com;
+  script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com ${adScriptDomains};
   style-src 'self' 'unsafe-inline';
   font-src 'self' data: https:;
   worker-src 'self' blob:;

@@ -170,6 +170,20 @@ type AnalyticsDashboard = {
   device_categories: Record<string, number>;
   top_pages: Record<string, number>;
   top_matches: Record<string, number>;
+  monetization: {
+    ad_opportunities: number;
+    ad_loaded: number;
+    ad_impressions: number;
+    ad_failed: number;
+    ad_blocked: number;
+    transition_shown: number;
+    transition_completed: number;
+    transition_completion_rate: number | null;
+    zones: Record<string, number>;
+    placements: Record<string, number>;
+    formats: Record<string, number>;
+    blocked_reasons: Record<string, number>;
+  };
   daily: Record<string, { visitors: number; events: number }>;
 };
 
@@ -191,6 +205,7 @@ const sections = [
   { key: "imports", label: "Imports", group: "Automation", icon: ClipboardList, href: "/admin/imports" },
   { key: "operations", label: "Operations", group: "Automation", icon: ServerCog, href: "/admin/system" },
   { key: "analytics", label: "Growth Analytics", group: "Automation", icon: Activity, href: "/admin/analytics" },
+  { key: "monetization", label: "Monetization", group: "Automation", icon: Activity, href: "/admin/monetization" },
   { key: "users", label: "Users", group: "System", icon: Shield, href: "/admin/users" },
   { key: "settings", label: "Settings", group: "System", icon: Settings, href: "/admin/settings" },
   { key: "audit", label: "Audit Log", group: "System", icon: ClipboardList, href: "/admin/audit-log" },
@@ -475,7 +490,8 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
         setDetailedHealth(appHealth.data);
         return;
       }
-      case "analytics": {
+      case "analytics":
+      case "monetization": {
         setAnalytics((await adminGet<ApiOne<AnalyticsDashboard>>("/admin/analytics?days=7")).data);
         return;
       }
@@ -657,6 +673,7 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
           {active === "imports" ? <ImportReviewView imports={fixtureImports} syncRuns={syncRuns} run={run} adminSend={adminSend} /> : null}
           {active === "operations" ? <OperationsView alerts={alerts} queueHealth={queueHealth} detailedHealth={detailedHealth} syncRuns={syncRuns} run={run} adminSend={adminSend} /> : null}
           {active === "analytics" ? <GrowthAnalyticsView analytics={analytics} /> : null}
+          {active === "monetization" ? <MonetizationView analytics={analytics} /> : null}
           {active === "homepage" ? <HomepageManager competitions={competitions} matches={matches} run={run} adminSend={adminSend} /> : null}
           {active === "announcements" ? <AnnouncementManager run={run} adminSend={adminSend} /> : null}
           {active === "users" ? <UserManager run={run} adminSend={adminSend} /> : null}
@@ -746,6 +763,39 @@ function GrowthAnalyticsView({ analytics }: { analytics: AnalyticsDashboard | nu
         <Panel title="Popular matches"><MetricList values={analytics.top_matches} /></Panel>
       </div>
       <p className="text-xs text-neutral-500">Values come from the RiFiTV first-party event pipeline for the last {analytics.range_days} days. Search Console, ad platforms and external attribution are not inferred here.</p>
+    </div>
+  );
+}
+
+function MonetizationView({ analytics }: { analytics: AnalyticsDashboard | null }) {
+  if (!analytics) {
+    return <Panel title="Monetization"><p className="text-sm text-neutral-400">Monetization analytics are loading. Revenue is not estimated here.</p></Panel>;
+  }
+
+  const data = analytics.monetization;
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
+        <Stat label="ad opportunities" value={data.ad_opportunities} />
+        <Stat label="script loads" value={data.ad_loaded} />
+        <Stat label="RiFiTV impressions" value={data.ad_impressions} />
+        <Stat label="blocked" value={data.ad_blocked} />
+        <Stat label="failed" value={data.ad_failed} />
+        <Stat label="prewatch completed" value={data.transition_completed} />
+      </div>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Panel title="Pre-watch funnel">
+          <CardLine title="Transitions shown" meta={String(data.transition_shown)} />
+          <CardLine title="Transitions completed" meta={String(data.transition_completed)} />
+          <CardLine title="Completion rate" meta={data.transition_completion_rate === null ? "No data yet" : `${data.transition_completion_rate}%`} />
+        </Panel>
+        <Panel title="Zones"><MetricList values={data.zones} /></Panel>
+        <Panel title="Placements"><MetricList values={data.placements} /></Panel>
+        <Panel title="Formats"><MetricList values={data.formats} /></Panel>
+        <Panel title="Blocked reasons"><MetricList values={data.blocked_reasons} /></Panel>
+      </div>
+      <p className="text-xs text-neutral-500">These are RiFiTV-side events only. Provider revenue, RPM and fill rate require legitimate network dashboard/API access and are not fabricated.</p>
     </div>
   );
 }

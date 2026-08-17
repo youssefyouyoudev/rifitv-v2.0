@@ -13,7 +13,7 @@ class AnalyticsEventController extends Controller
     {
         $validated = $request->validated();
         $payload = collect($validated['payload'] ?? [])
-            ->only(['match_slug', 'competition', 'status', 'playback_status', 'share_method', 'source_id', 'source_count', 'error_type', 'source', 'device_category', 'query_length', 'result_count', 'target', 'enabled'])
+            ->only(['match_slug', 'competition', 'status', 'playback_status', 'share_method', 'source_id', 'source_count', 'error_type', 'source', 'device_category', 'query_length', 'result_count', 'target', 'enabled', 'ad_zone', 'ad_placement', 'ad_format', 'reason'])
             ->map(static fn (mixed $value): string|int|float|bool|null => is_scalar($value) || $value === null ? $value : null)
             ->filter(static fn (mixed $value): bool => $value !== null)
             ->all();

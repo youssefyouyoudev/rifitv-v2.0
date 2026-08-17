@@ -152,6 +152,22 @@ textarea {
   text-decoration: none;
 }
 
+.ad-slot {
+  min-height: 5.5rem;
+  display: grid;
+  place-items: center;
+}
+
+.ad-slot[data-ad-visible="false"] {
+  opacity: 0.78;
+}
+
+.ad-slot iframe,
+.ad-slot ins,
+.ad-slot * {
+  max-width: 100%;
+}
+
 .rifitv-player-stage {
   aspect-ratio: 16 / 9;
 }

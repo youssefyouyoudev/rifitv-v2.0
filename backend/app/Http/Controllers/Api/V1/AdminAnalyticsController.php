@@ -31,6 +31,7 @@ class AdminAnalyticsController extends Controller
             'device_categories' => $this->countPayloadValue($events, 'device_category'),
             'top_pages' => $this->countPaths($events),
             'top_matches' => $this->countPayloadValue($events, 'match_slug'),
+            'monetization' => $this->monetization($events),
             'daily' => $this->dailyVisitors($events),
         ]]);
     }
@@ -68,5 +69,27 @@ class AdminAnalyticsController extends Controller
             ])
             ->sortKeys()
             ->all();
+    }
+
+    private function monetization($events): array
+    {
+        $adEvents = $events->filter(static fn (AnalyticsEvent $event): bool => str_starts_with($event->event, 'ad_'));
+        $transitionShown = $events->where('event', 'ad_transition_shown')->count();
+        $transitionCompleted = $events->where('event', 'ad_transition_completed')->count();
+
+        return [
+            'ad_opportunities' => $events->where('event', 'ad_eligible')->count(),
+            'ad_loaded' => $events->where('event', 'ad_loaded')->count(),
+            'ad_impressions' => $events->where('event', 'ad_impression')->count(),
+            'ad_failed' => $events->where('event', 'ad_failed')->count(),
+            'ad_blocked' => $events->where('event', 'ad_blocked')->count(),
+            'transition_shown' => $transitionShown,
+            'transition_completed' => $transitionCompleted,
+            'transition_completion_rate' => $transitionShown > 0 ? round(($transitionCompleted / $transitionShown) * 100, 1) : null,
+            'zones' => $this->countPayloadValue($adEvents, 'ad_zone'),
+            'placements' => $this->countPayloadValue($adEvents, 'ad_placement'),
+            'formats' => $this->countPayloadValue($adEvents, 'ad_format'),
+            'blocked_reasons' => $this->countPayloadValue($adEvents, 'reason'),
+        ];
     }
 }

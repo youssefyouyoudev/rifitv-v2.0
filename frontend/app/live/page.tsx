@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/AppShell";
+import { AdPlacement } from "@/components/AdPlacement";
 import { MatchSection } from "@/components/MatchSection";
 import { getHome, getMatches } from "@/lib/api";
 import { selectLaterToday, selectNextBroadcast } from "@/lib/liveSchedule";
@@ -39,6 +40,7 @@ export default async function LivePage() {
             ) : null}
           </section>
         )}
+        <AdPlacement name="live_between_sections" />
         {remaining.length > 0 ? <MatchSection title="Later today" matches={remaining} serverDate={home.date} /> : null}
       </div>
     </AppShell>

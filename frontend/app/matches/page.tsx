@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { Fragment } from "react";
+import { AdPlacement } from "@/components/AdPlacement";
 import { AppShell } from "@/components/AppShell";
 import { MatchCard } from "@/components/MatchCard";
 import { getCompetitions, getMatches } from "@/lib/api";
@@ -107,7 +109,12 @@ export default async function MatchesPage({ searchParams }: PageProps<"/matches"
                   <div key={competitionGroup.key} className="space-y-3">
                     <h3 className="text-sm font-semibold uppercase text-[var(--muted)]">{competitionGroup.title}</h3>
                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                      {competitionGroup.matches.map((match) => <MatchCard key={match.id} match={match} />)}
+                      {competitionGroup.matches.map((match, index) => (
+                        <Fragment key={match.id}>
+                          <MatchCard match={match} />
+                          {(index + 1) % 5 === 0 ? <div className="sm:col-span-2 xl:col-span-3"><AdPlacement name="matches_in_feed" /></div> : null}
+                        </Fragment>
+                      ))}
                     </div>
                   </div>
                 ))}
