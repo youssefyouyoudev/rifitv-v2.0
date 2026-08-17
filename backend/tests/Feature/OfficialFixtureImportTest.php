@@ -19,6 +19,7 @@ it('imports 2026-27 fixture snapshots as verified provenance data', function ():
 
     expect(GameMatch::query()->whereIn('provider', ['official-premier-league', 'official-laliga', 'official-psg'])->count())->toBe(340)
         ->and(GameMatch::query()->where('verification_status', 'verified')->count())->toBe(340)
+        ->and(GameMatch::query()->whereIn('provider', ['official-premier-league', 'official-laliga', 'official-psg'])->where('featured', true)->count())->toBe(0)
         ->and(GameMatch::query()->whereNull('source_verified_at')->exists())->toBeFalse()
         ->and(GameMatch::query()->whereNull('source_provider')->exists())->toBeFalse()
         ->and(GameMatch::query()->whereNull('source_external_id')->exists())->toBeFalse()

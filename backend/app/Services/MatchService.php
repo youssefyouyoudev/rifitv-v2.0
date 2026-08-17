@@ -36,6 +36,18 @@ class MatchService
         return $match->fresh(['competition', 'homeTeam', 'awayTeam', 'channels.streamSources']);
     }
 
+    public function setPublication(GameMatch $match, bool $published, ?string $visibility, ?User $actor): GameMatch
+    {
+        $before = $match->only(['published_at', 'visibility']);
+        $match->update([
+            'published_at' => $published ? ($match->published_at ?? now()) : null,
+            'visibility' => $visibility ?? ($published ? MatchVisibility::Public : $match->visibility),
+        ]);
+        $this->audit->record($actor, $published ? 'match.published' : 'match.unpublished', $match, ['before' => $before]);
+
+        return $match->fresh(['competition', 'homeTeam', 'awayTeam', 'channels.streamSources']);
+    }
+
     public function duplicate(GameMatch $match, ?User $actor): GameMatch
     {
         $copy = $match->replicate(['slug', 'home_score', 'away_score', 'minute', 'status', 'published_at', 'source_external_id', 'source_hash']);
@@ -70,10 +82,10 @@ class MatchService
 
         foreach ($matches as $match) {
             match ($action) {
-                'publish' => $match->update(['published_at' => now(), 'visibility' => MatchVisibility::Public]),
+                'publish' => $match->update(['published_at' => $match->published_at ?? now(), 'visibility' => MatchVisibility::Public]),
                 'unpublish' => $match->update(['published_at' => null]),
-                'feature' => $match->update(['featured' => true]),
-                'unfeature' => $match->update(['featured' => false]),
+                'feature' => $this->setFeatured($match, true),
+                'unfeature' => $this->setFeatured($match, false),
                 'verify' => $match->update(['verification_status' => 'manual_verified', 'source_verified_at' => now()]),
                 'assign_competition' => $match->update(['competition_id' => (int) $options['competition_id']]),
                 'set_status' => $match->update(['status' => MatchStatus::from($options['status'])]),
@@ -98,6 +110,11 @@ class MatchService
         $isManual = in_array($sourceProvider, ['manual', 'manual-admin', 'manual-copy'], true);
         $verificationStatus = $existing?->verification_status ?? 'pending_verification';
         $sourceVerifiedAt = $existing?->source_verified_at;
+        $manualOverrides = $existing?->manual_overrides ?? [];
+
+        if (array_key_exists('featured', $data)) {
+            data_set($manualOverrides, 'featured', true);
+        }
 
         if ($isManual && $published) {
             $verificationStatus = 'manual_verified';
@@ -119,6 +136,7 @@ class MatchService
             'away_score' => $data['away_score'] ?? $existing?->away_score,
             'minute' => $data['minute'] ?? $existing?->minute,
             'featured' => $data['featured'] ?? $existing?->featured ?? false,
+            'manual_overrides' => $manualOverrides,
             'published_at' => $published ? ($existing?->published_at ?? now()) : null,
             'visibility' => $data['visibility'] ?? $existing?->visibility ?? MatchVisibility::Public,
             'seo_title' => $data['seo_title'] ?? $existing?->seo_title,
@@ -135,6 +153,14 @@ class MatchService
         ])->all();
 
         $match->channels()->sync($sync);
+    }
+
+    private function setFeatured(GameMatch $match, bool $featured): bool
+    {
+        $manualOverrides = $match->manual_overrides ?? [];
+        data_set($manualOverrides, 'featured', true);
+
+        return $match->update(['featured' => $featured, 'manual_overrides' => $manualOverrides]);
     }
 
     private function uniqueSlug(string $base): string

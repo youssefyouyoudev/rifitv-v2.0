@@ -23,6 +23,16 @@ export const adminTimeFormatter = new Intl.DateTimeFormat("en-GB", {
   timeZone: RI_FI_TV_TIMEZONE,
 });
 
+export const adminShortDateFormatter = new Intl.DateTimeFormat("en-GB", {
+  day: "2-digit",
+  month: "short",
+  timeZone: RI_FI_TV_TIMEZONE,
+});
+
+export function formatAdminDateChip(value: string): string {
+  return adminShortDateFormatter.format(new Date(`${value}T12:00:00Z`)).toUpperCase();
+}
+
 export function localTodayDate(): string {
   return localDateKey(new Date());
 }

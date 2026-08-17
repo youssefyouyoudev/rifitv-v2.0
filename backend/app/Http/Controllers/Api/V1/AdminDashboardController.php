@@ -14,23 +14,25 @@ use App\Models\OperationalAlert;
 use App\Models\StreamSource;
 use App\Models\SyncRun;
 use App\Models\Team;
-use App\Services\MatchDateWindowService;
+use App\Services\MatchScheduleService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class AdminDashboardController extends Controller
 {
-    public function __invoke(MatchDateWindowService $dateWindow)
+    public function __invoke(MatchScheduleService $schedule)
     {
-        $today = GameMatch::query()->onLocalDate($dateWindow->today());
+        $attentionMatches = collect($schedule->attentionMatches(new Request))
+            ->filter(fn (GameMatch $match): bool => $match->channels->isEmpty())
+            ->values();
+        $counterLabels = $schedule->counterLabels();
 
         return response()->json([
             'data' => [
-                'counts' => [
-                    'today_matches' => (clone $today)->count(),
-                    'live_now' => GameMatch::query()->whereIn('status', ['live', 'halftime'])->count(),
-                    'upcoming' => (clone $today)->where('status', 'scheduled')->count(),
-                    'finished' => (clone $today)->where('status', 'finished')->count(),
+                'counts' => $schedule->counters(),
+                'counter_labels' => $counterLabels,
+                'system_counts' => [
                     'stream_problems' => StreamSource::query()->whereIn('last_known_status', ['offline', 'degraded'])->count(),
                     'open_alerts' => OperationalAlert::query()->where('status', 'open')->count(),
                     'pending_jobs' => DB::table('jobs')->count(),
@@ -46,7 +48,7 @@ class AdminDashboardController extends Controller
                 'attention' => [
                     'alerts' => OperationalAlertResource::collection(OperationalAlert::query()->where('status', 'open')->latest()->limit(8)->get()),
                     'stream_problems' => StreamSourceResource::collection(StreamSource::query()->with('channel')->whereIn('last_known_status', ['offline', 'degraded'])->limit(8)->get()),
-                    'unassigned_matches' => MatchResource::collection(GameMatch::query()->publicGraph()->doesntHave('channels')->limit(8)->get()),
+                    'unassigned_matches' => MatchResource::collection($attentionMatches),
                 ],
                 'operations' => [
                     'scheduler_last_seen_at' => Cache::get('rifitv:scheduler:last_seen_at'),

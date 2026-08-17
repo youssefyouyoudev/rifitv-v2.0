@@ -20,6 +20,7 @@ use App\Models\StreamSource;
 use App\Models\SyncRun;
 use App\Services\MatchDateWindowService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -33,7 +34,7 @@ class AdminOperationsController extends Controller
         $matches = GameMatch::query()
             ->publicGraph()
             ->onLocalDate($today)
-            ->orderByRaw('COALESCE(kickoff_at, scheduled_date)')
+            ->scheduleOrder()
             ->get();
 
         return response()->json(['data' => [
@@ -41,7 +42,7 @@ class AdminOperationsController extends Controller
             'starting_soon' => MatchResource::collection($matches->filter(fn (GameMatch $match): bool => $match->status->value === 'scheduled' && $match->kickoff_at !== null && $match->kickoff_at->between($now, $now->copy()->addHours(2)))->values()),
             'later_today' => MatchResource::collection($matches->filter(fn (GameMatch $match): bool => $match->status->value === 'scheduled' && ($match->kickoff_at === null || $match->kickoff_at->gt($now->copy()->addHours(2))))->values()),
             'finished' => MatchResource::collection($matches->filter(fn (GameMatch $match): bool => $match->status->value === 'finished')->values()),
-            'readiness' => $matches->mapWithKeys(fn (GameMatch $match): array => [$match->id => $this->readiness($match)]),
+            'readiness' => $matches->mapWithKeys(fn (GameMatch $match): array => [$match->id => $this->readiness($match, $today, $now, $dateWindow)]),
         ]]);
     }
 
@@ -102,14 +103,25 @@ class AdminOperationsController extends Controller
         return response()->json(['data' => ['message' => 'Operation queued']]);
     }
 
-    private function readiness(GameMatch $match): array
+    private function readiness(GameMatch $match, string $today, Carbon $now, MatchDateWindowService $dateWindow): array
     {
         $sources = $match->channels->flatMap->streamSources->filter(fn (StreamSource $source): bool => (bool) $source->enabled);
         $healthy = $sources->contains(fn (StreamSource $source): bool => $source->last_known_status->value === 'healthy');
         $sourceCount = $sources->count();
+        $isLive = in_array($match->status->value, ['live', 'halftime'], true);
+        $startsSoon = $match->status->value === 'scheduled'
+            && $match->kickoff_at !== null
+            && $match->kickoff_at->between($now, $now->copy()->addMinutes(30));
+        $startsToday = $match->kickoff_at === null
+            ? $match->scheduled_date?->toDateString() === $today
+            : $dateWindow->dateForInstant($match->kickoff_at) === $today;
 
         return [
-            'state' => ! $match->published_at || $sourceCount === 0 ? 'critical' : ($healthy && $sourceCount > 1 ? 'ready' : 'warning'),
+            'state' => $isLive && ! $healthy
+                ? 'critical'
+                : (($startsSoon && ! $healthy) || ($startsToday && $match->channels->isEmpty())
+                    ? 'warning'
+                    : ($healthy ? 'ready' : 'normal')),
             'published' => (bool) $match->published_at,
             'channels' => $match->channels->count(),
             'healthy_source' => $healthy,

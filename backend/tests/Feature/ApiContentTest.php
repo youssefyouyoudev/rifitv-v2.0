@@ -138,8 +138,8 @@ it('keeps pending imported fixtures private while allowing explicitly published 
         'slug' => 'manual-published-match',
         'source_provider' => 'manual-admin',
         'source_external_id' => null,
-        'source_verified_at' => null,
-        'verification_status' => 'pending_verification',
+        'source_verified_at' => now(),
+        'verification_status' => 'manual_verified',
         'published_at' => now(),
         'visibility' => MatchVisibility::Public,
     ]);

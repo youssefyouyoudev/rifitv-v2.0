@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Enums\MatchStatus;
+use App\Http\Resources\AuditLogResource;
 use App\Http\Resources\MatchResource;
+use App\Models\AuditLog;
 use App\Models\Channel;
 use App\Models\GameMatch;
 use App\Models\User;
@@ -26,6 +28,13 @@ class MatchControlService
             'playback_window' => $this->playbackWindow->stateFor($match),
             'assigned_channels' => $this->assignedChannels($match),
             'stream_summary' => $this->streamSummary($match),
+            'audit_history' => AuditLogResource::collection(AuditLog::query()
+                ->with('actor')
+                ->where('entity_type', GameMatch::class)
+                ->where('entity_id', $match->id)
+                ->latest()
+                ->limit(10)
+                ->get()),
             'actions' => [
                 'statuses' => array_column(MatchStatus::cases(), 'value'),
                 'playback' => ['open_now', 'close_now', 'extend_15', 'extend_30', 'reopen_30'],

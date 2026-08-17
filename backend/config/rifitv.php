@@ -5,6 +5,7 @@ return [
     'result_sync_enabled' => env('RESULT_SYNC_ENABLED', true),
     'stream_health_enabled' => env('STREAM_HEALTH_ENABLED', true),
     'fixture_sync_horizon_days' => (int) env('FIXTURE_SYNC_HORIZON_DAYS', 14),
+    'admin_upcoming_days' => (int) env('ADMIN_UPCOMING_DAYS', 7),
     'missing_broadcast_alert_minutes' => (int) env('MISSING_BROADCAST_ALERT_MINUTES', 30),
     'display_timezone' => env('RIFITV_DISPLAY_TIMEZONE', 'Africa/Casablanca'),
     'playback_open_before_minutes' => (int) env('PLAYBACK_OPEN_BEFORE_MINUTES', 10),

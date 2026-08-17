@@ -2,6 +2,8 @@
 
 import {
   Activity,
+  ArrowLeft,
+  ArrowRight,
   Bell,
   Cable,
   CalendarDays,
@@ -12,6 +14,7 @@ import {
   ListVideo,
   Lock,
   Menu,
+  MoreHorizontal,
   Play,
   Plus,
   Radio,
@@ -22,6 +25,7 @@ import {
   Settings,
   Shield,
   Square,
+  Star,
   Trophy,
   Users,
   X,
@@ -33,7 +37,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { RiFiTVLogo } from "@/components/RiFiTVLogo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { apiFetch, ApiError, csrfCookie } from "@/lib/api";
-import { addDays, adminDateFormatter, adminTimeFormatter, localDateKey, localDateTimeInput, localTodayDate } from "@/lib/footballDate";
+import { addDays, adminDateFormatter, adminTimeFormatter, formatAdminDateChip, localDateKey, localDateTimeInput, localTodayDate } from "@/lib/footballDate";
 
 type ApiList<T> = { data: T[]; admin_meta?: AdminMatchMeta; meta?: { current_page?: number; last_page?: number; total?: number; per_page?: number } };
 type ApiOne<T> = { data: T };
@@ -50,6 +54,13 @@ type Match = Entity & {
   minute: number | null;
   featured: boolean;
   published_at: string | null;
+  visibility?: string | null;
+  publication?: {
+    status: "draft" | "published" | "hidden";
+    label: string;
+    publicly_visible: boolean;
+    block_reason: string | null;
+  };
   kickoff_at: string | null;
   scheduled_date?: string | null;
   kickoff_precision?: string;
@@ -86,12 +97,14 @@ type MatchControl = {
   playback_window: PlaybackWindow;
   assigned_channels: ControlChannel[];
   stream_summary: { channels: number; sources: number; enabled_sources: number; healthy_sources: number; offline_sources: number };
+  audit_history?: Array<{ id: number; action: string; actor?: { name?: string }; created_at: string | null; metadata?: Record<string, unknown> | null }>;
   actions: { statuses: string[]; playback: string[] };
 };
 type AdminMatchMeta = {
   timezone: string;
   statuses: Array<{ value: string; label: string; rank: number }>;
   counters: Record<"today" | "live" | "upcoming" | "finished" | "needs_channel" | "needs_verification" | "featured", number>;
+  counter_labels?: Record<string, string>;
   attention: Match[];
 };
 type Playlist = Entity & {
@@ -121,11 +134,13 @@ type PlaylistTestResult = {
 };
 type Dashboard = {
   counts: Record<string, number>;
+  counter_labels?: Record<string, string>;
+  system_counts?: Record<string, number>;
   live_now: Match[];
   attention: { alerts?: Alert[]; stream_problems: Entity[]; unassigned_matches: Match[] };
   operations?: { scheduler_last_seen_at: string | null; last_fixture_sync: SyncRun | null; last_result_sync: SyncRun | null };
 };
-type Readiness = { state: "ready" | "warning" | "critical"; published: boolean; channels: number; healthy_source: boolean; source_count: number };
+type Readiness = { state: "normal" | "ready" | "warning" | "critical"; published: boolean; channels: number; healthy_source: boolean; source_count: number };
 type TodayOps = {
   live: Match[];
   starting_soon: Match[];
@@ -612,8 +627,8 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
           {notice ? <Toast tone="success" message={notice} onClose={() => setNotice(null)} /> : null}
           {error ? <Toast tone="error" message={error} onClose={() => setError(null)} /> : null}
           {active === "dashboard" ? <DashboardView dashboard={dashboard} setActive={setActive} /> : null}
-          {active === "today" || active === "upcoming" ? <TodayOperationsView today={today} setActive={setActive} /> : null}
-          {active === "matches" ? <MatchManager matches={matches} teams={teams} competitions={competitions} channels={channels} run={run} adminGet={adminGet} adminSend={adminSend} openControl={(matchId) => { setActiveOverride(null); setControlMatchId(matchId); router.push(`/admin/matches/${matchId}/control`); }} /> : null}
+          {active === "today" || active === "upcoming" ? <TodayOperationsView today={today} setActive={setActive} run={run} adminSend={adminSend} openControl={(matchId) => { setActiveOverride(null); setControlMatchId(matchId); router.push(`/admin/matches/${matchId}/control`); }} /> : null}
+          {active === "matches" ? <MatchManager matches={matches} teams={teams} competitions={competitions} channels={channels} run={run} adminGet={adminGet} adminSend={adminSend} notifySuccess={(message) => setNotice(message)} openControl={(matchId) => { setActiveOverride(null); setControlMatchId(matchId); router.push(`/admin/matches/${matchId}/control`); }} /> : null}
           {active === "match-control" ? <MatchControlCenter matches={matches} channels={channels} control={matchControl} selectedId={selectedControlMatchId} onSelectMatch={setControlMatchId} loadControl={loadControl} run={run} adminSend={adminSend} /> : null}
           {active === "live" ? <LiveControl matches={matches} run={run} adminSend={adminSend} /> : null}
           {active === "teams" ? <SimpleManager title="Teams" endpoint="/admin/teams" items={teams} fields={["name", "short_name", "country_code", "primary_color"]} toggles={["active", "featured"]} run={run} adminSend={adminSend} /> : null}
@@ -666,10 +681,12 @@ function AdminLoadingShell() {
 }
 
 function DashboardView({ dashboard, setActive }: { dashboard: Dashboard | null; setActive: (key: string) => void }) {
+  const counterOrder = ["today", "live", "upcoming", "finished", "needs_channel", "needs_verification", "featured"];
+
   return (
     <div className="space-y-6">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        {Object.entries(dashboard?.counts ?? {}).slice(0, 6).map(([key, value]) => <Stat key={key} label={key.replaceAll("_", " ")} value={value} />)}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
+        {counterOrder.map((key) => <Stat key={key} label={dashboard?.counter_labels?.[key] ?? key.replaceAll("_", " ")} value={dashboard?.counts[key] ?? 0} />)}
       </div>
       <div className="grid gap-4 xl:grid-cols-2">
         <Panel title="Live Now" action={<button onClick={() => setActive("live")} className="text-sm text-red-300">Control</button>}>
@@ -687,7 +704,7 @@ function DashboardView({ dashboard, setActive }: { dashboard: Dashboard | null; 
   );
 }
 
-function TodayOperationsView({ today, setActive }: { today: TodayOps | null; setActive: (key: string) => void }) {
+function TodayOperationsView({ today, setActive, run, adminSend, openControl }: ManagerProps & { today: TodayOps | null; setActive: (key: string) => void; openControl: (matchId: number) => void }) {
   const readiness = today?.readiness ?? {};
   const allMatches = [...(today?.live ?? []), ...(today?.starting_soon ?? []), ...(today?.later_today ?? []), ...(today?.finished ?? [])];
   const ready = allMatches.filter((match) => readiness[String(match.id)]?.state === "ready").length;
@@ -703,14 +720,14 @@ function TodayOperationsView({ today, setActive }: { today: TodayOps | null; set
       </div>
       <div className="grid gap-4 xl:grid-cols-2">
         <Panel title="Live & Starting Soon" action={<button onClick={() => setActive("live")} className="text-sm text-red-300">Live Control</button>}>
-          <ReadinessRows matches={[...(today?.live ?? []), ...(today?.starting_soon ?? [])]} readiness={readiness} />
+          <ReadinessRows matches={[...(today?.live ?? []), ...(today?.starting_soon ?? [])]} readiness={readiness} onManage={openControl} onChannels={openControl} onGoLive={(matchId) => run(async () => { await adminSend(`/admin/matches/${matchId}/control/status`, "PATCH", { status: "live", override_transition: true }); }, "Match marked live")} />
         </Panel>
         <Panel title="Later Today">
-          <ReadinessRows matches={today?.later_today ?? []} readiness={readiness} />
+          <ReadinessRows matches={today?.later_today ?? []} readiness={readiness} onManage={openControl} onChannels={openControl} onGoLive={(matchId) => run(async () => { await adminSend(`/admin/matches/${matchId}/control/status`, "PATCH", { status: "live", override_transition: true }); }, "Match marked live")} />
         </Panel>
       </div>
       <Panel title="Finished">
-        <ReadinessRows matches={today?.finished ?? []} readiness={readiness} />
+        <ReadinessRows matches={today?.finished ?? []} readiness={readiness} onManage={openControl} onChannels={openControl} />
       </Panel>
     </div>
   );
@@ -812,7 +829,7 @@ function OperationsView({ alerts, queueHealth, detailedHealth, syncRuns, run, ad
   );
 }
 
-function MatchManager({ matches, teams, competitions, channels, run, adminGet, adminSend, openControl }: ManagerProps & { adminGet: <T>(path: string, signal?: AbortSignal) => Promise<T>; matches: Match[]; teams: Entity[]; competitions: Entity[]; channels: Entity[]; openControl: (matchId: number) => void }) {
+function MatchManager({ matches, teams, competitions, channels, run, adminGet, adminSend, notifySuccess, openControl }: ManagerProps & { adminGet: <T>(path: string, signal?: AbortSignal) => Promise<T>; matches: Match[]; teams: Entity[]; competitions: Entity[]; channels: Entity[]; openControl: (matchId: number) => void }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -821,6 +838,11 @@ function MatchManager({ matches, teams, competitions, channels, run, adminGet, a
   const [page, setPage] = useState({ current_page: 1, last_page: 1, total: matches.length, per_page: 50 });
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [assignMatch, setAssignMatch] = useState<Match | null>(null);
+  const [deleteMatch, setDeleteMatch] = useState<Match | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deletePending, setDeletePending] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkActionError, setBulkActionError] = useState<string | null>(null);
   const [channelSearch, setChannelSearch] = useState("");
   const [selectedChannelIds, setSelectedChannelIds] = useState<number[]>([]);
   const [bulkAction, setBulkAction] = useState("verify");
@@ -838,11 +860,25 @@ function MatchManager({ matches, teams, competitions, channels, run, adminGet, a
     search: searchParams.get("search") ?? "",
     page: searchParams.get("page") ?? "1",
   }));
-  const [form, setForm] = useState({ competition_id: "", home_team_id: "", away_team_id: "", kickoff_at: localDateTime(), featured: true, published: true, channel_ids: [] as number[] });
+  const [searchDraft, setSearchDraft] = useState(() => searchParams.get("search") ?? "");
+  const [form, setForm] = useState({ competition_id: "", home_team_id: "", away_team_id: "", kickoff_at: localDateTime(), featured: false, published: true, channel_ids: [] as number[] });
 
   useEffect(() => {
     setItems(matches);
   }, [matches]);
+
+  useEffect(() => {
+    setSearchDraft(filters.search);
+  }, [filters.search]);
+
+  useEffect(() => {
+    if (searchDraft === filters.search) return;
+    const timeout = window.setTimeout(() => updateFilters({ search: searchDraft }), 350);
+
+    return () => window.clearTimeout(timeout);
+    // Search intentionally updates the URL after a short debounce.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchDraft]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -880,6 +916,12 @@ function MatchManager({ matches, teams, competitions, channels, run, adminGet, a
     const payload = await adminGet<ApiList<Match>>(`/admin/matches?${matchQuery(filters).toString()}`);
     setItems(payload.data);
     setMeta(payload.admin_meta ?? null);
+    setPage({
+      current_page: payload.meta?.current_page ?? 1,
+      last_page: payload.meta?.last_page ?? 1,
+      total: payload.meta?.total ?? payload.data.length,
+      per_page: payload.meta?.per_page ?? 50,
+    });
   }
 
   function toggleSelected(id: number) {
@@ -891,16 +933,59 @@ function MatchManager({ matches, teams, competitions, channels, run, adminGet, a
     setSelectedChannelIds((match.channels ?? []).map((channel) => channel.id));
   }
 
+  function openDelete(match: Match) {
+    setDeleteMatch(match);
+    setDeleteError(null);
+  }
+
+  async function confirmDelete() {
+    if (!deleteMatch) return;
+    setDeletePending(true);
+    setDeleteError(null);
+
+    try {
+      await adminSend(`/admin/matches/${deleteMatch.id}`, "DELETE", { confirm_delete: true });
+      setDeleteMatch(null);
+      setSelectedIds((ids) => ids.filter((id) => id !== deleteMatch.id));
+      await refreshMatches();
+      notifySuccess?.("Match deleted.");
+    } catch (caught) {
+      setDeleteError(apiErrorMessage(caught));
+    } finally {
+      setDeletePending(false);
+    }
+  }
+
+  async function confirmBulkDelete() {
+    setBulkActionError(null);
+    try {
+      await adminSend("/admin/matches/bulk", "POST", { ids: selectedIds, action: "delete", confirm_delete: true });
+      setSelectedIds([]);
+      setBulkDeleteOpen(false);
+      await refreshMatches();
+      notifySuccess?.(`${selectedIds.length} matches deleted.`);
+    } catch (caught) {
+      setBulkActionError(apiErrorMessage(caught));
+    }
+  }
+
   async function applyBulkAction() {
     if (selectedIds.length === 0) return;
-    if (bulkAction === "delete" && !window.confirm(`Archive ${selectedIds.length} selected matches?`)) return;
+    setBulkActionError(null);
+    if (bulkAction === "delete") {
+      setBulkDeleteOpen(true);
+      return;
+    }
+    if (bulkAction === "assign_competition" && !bulkCompetition) {
+      setBulkActionError("Choose a competition before applying this action.");
+      return;
+    }
     await run(async () => {
       await adminSend("/admin/matches/bulk", "POST", {
         ids: selectedIds,
         action: bulkAction,
         competition_id: bulkAction === "assign_competition" ? Number(bulkCompetition) : undefined,
         status: bulkAction === "set_status" ? bulkStatus : undefined,
-        confirm_delete: bulkAction === "delete" ? true : undefined,
       });
       setSelectedIds([]);
       await refreshMatches();
@@ -917,16 +1002,16 @@ function MatchManager({ matches, teams, competitions, channels, run, adminGet, a
     <div className="space-y-5">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
         {[
-          ["Today", meta?.counters.today ?? 0, { date: localTodayDate() }],
-          ["Live", meta?.counters.live ?? 0, { status: "live" }],
-          ["Upcoming", meta?.counters.upcoming ?? 0, { status: "scheduled" }],
-          ["Finished", meta?.counters.finished ?? 0, { status: "finished" }],
-          ["Needs Channel", meta?.counters.needs_channel ?? 0, { channel: "missing" }],
-          ["Needs Verification", meta?.counters.needs_verification ?? 0, { verification: "pending" }],
-          ["Featured", meta?.counters.featured ?? 0, { featured: "1" }],
+          ["today", meta?.counters.today ?? 0, { date: localTodayDate() }],
+          ["live", meta?.counters.live ?? 0, { status: "live" }],
+          ["upcoming", meta?.counters.upcoming ?? 0, { status: "scheduled" }],
+          ["finished", meta?.counters.finished ?? 0, { status: "finished" }],
+          ["needs_channel", meta?.counters.needs_channel ?? 0, { channel: "missing" }],
+          ["needs_verification", meta?.counters.needs_verification ?? 0, { verification: "pending" }],
+          ["featured", meta?.counters.featured ?? 0, { featured: "1" }],
         ].map(([label, value, next]) => (
           <button key={String(label)} className="rounded-lg border border-white/10 bg-neutral-900 p-4 text-left hover:border-red-400/40" onClick={() => updateFilters(next as Partial<typeof filters>)}>
-            <span className="text-sm text-neutral-400">{String(label)}</span>
+            <span className="text-sm text-neutral-400">{meta?.counter_labels?.[String(label)] ?? labelize(String(label))}</span>
             <strong className="mt-2 block text-2xl text-white">{Number(value)}</strong>
           </button>
         ))}
@@ -944,24 +1029,36 @@ function MatchManager({ matches, teams, competitions, channels, run, adminGet, a
       <div className="grid gap-5 xl:grid-cols-[360px_1fr]">
         <div className="space-y-5">
           <Panel title="Date">
-            <div className="grid grid-cols-2 gap-2">
-              <button className="h-10 rounded-md border border-white/10 bg-black/20 text-sm text-white" onClick={() => updateFilters({ date: addDays(filters.date || localTodayDate(), -1) })}>Previous day</button>
-              <button className="h-10 rounded-md border border-white/10 bg-black/20 text-sm text-white" onClick={() => updateFilters({ date: addDays(filters.date || localTodayDate(), 1) })}>Next day</button>
-              <button className="h-10 rounded-md bg-red-600 text-sm font-semibold text-white" onClick={() => updateFilters({ date: localTodayDate() })}>Today</button>
-              <button className="h-10 rounded-md bg-neutral-800 text-sm font-semibold text-white" onClick={() => updateFilters({ date: addDays(localTodayDate(), 1) })}>Tomorrow</button>
+            <div className="grid grid-cols-[44px_minmax(0,1fr)_minmax(0,1fr)_44px] gap-2">
+              <button className="grid h-12 place-items-center rounded-md border border-white/10 bg-black/20 text-white" aria-label="Previous day" title="Previous day" onClick={() => updateFilters({ date: addDays(filters.date || localTodayDate(), -1) })}><ArrowLeft className="h-4 w-4" /></button>
+              <button className={`h-12 rounded-md border px-2 text-center ${filters.date === localTodayDate() ? "border-red-400 bg-red-600/20 text-white" : "border-white/10 bg-black/20 text-neutral-300"}`} onClick={() => updateFilters({ date: localTodayDate() })}>
+                <span className="block text-xs font-semibold">{formatAdminDateChip(filters.date)}</span>
+                <span className="block text-[10px] uppercase text-neutral-400">{filters.date === localTodayDate() ? "Today" : "Selected"}</span>
+              </button>
+              <button className="h-12 rounded-md border border-white/10 bg-black/20 px-2 text-center text-neutral-300" onClick={() => updateFilters({ date: addDays(filters.date || localTodayDate(), 1) })}>
+                <span className="block text-xs font-semibold">{formatAdminDateChip(addDays(filters.date || localTodayDate(), 1))}</span>
+                <span className="block text-[10px] uppercase text-neutral-400">Tomorrow</span>
+              </button>
+              <button className="grid h-12 place-items-center rounded-md border border-white/10 bg-black/20 text-white" aria-label="Next day" title="Next day" onClick={() => updateFilters({ date: addDays(filters.date || localTodayDate(), 1) })}><ArrowRight className="h-4 w-4" /></button>
             </div>
-            <Input label="Jump to date" type="date" value={filters.date} onChange={(date) => updateFilters({ date })} />
+            <label className="flex h-10 items-center justify-center gap-2 rounded-md border border-white/10 bg-black/20 px-3 text-sm text-neutral-300">
+              <CalendarDays className="h-4 w-4" />
+              <span>Jump to date</span>
+              <input className="min-w-0 flex-1 bg-transparent text-right text-sm text-white outline-none" aria-label="Jump to date" type="date" value={filters.date} onChange={(event) => updateFilters({ date: event.target.value })} />
+            </label>
           </Panel>
 
-          <Panel title="Filters">
-            <Input label="Search" value={filters.search} onChange={(search) => updateFilters({ search })} />
-            <Select label="Competition" value={filters.competition_id} options={competitions} onChange={(competition_id) => updateFilters({ competition_id })} />
-            <Select label="Team" value={filters.team_id} options={teams} onChange={(team_id) => updateFilters({ team_id })} />
-            <SelectRaw label="Status" value={filters.status} options={["", "scheduled", "active", "live", "halftime", "finished", "postponed", "cancelled"]} onChange={(status) => updateFilters({ status })} />
-            <SelectRaw label="Featured" value={filters.featured} options={["", "1", "0"]} onChange={(featured) => updateFilters({ featured })} />
-            <SelectRaw label="Channel assigned" value={filters.channel} options={["", "has", "missing"]} onChange={(channel) => updateFilters({ channel })} />
-            <SelectRaw label="Verification" value={filters.verification} options={["", "verified", "pending", "problem"]} onChange={(verification) => updateFilters({ verification })} />
-            <SelectRaw label="Stream status" value={filters.stream_status} options={["", "healthy", "missing", "problem"]} onChange={(stream_status) => updateFilters({ stream_status })} />
+          <Panel title="Filters" action={<button className="text-xs font-semibold text-red-300" onClick={() => updateFilters({ competition_id: "", team_id: "", status: "", featured: "", channel: "", verification: "", stream_status: "", search: "", page: "1" })}>Reset filters</button>}>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="sm:col-span-2"><Input label="Search team, competition, ID, slug, or channel" value={searchDraft} onChange={setSearchDraft} /></div>
+              <Select label="Competition" value={filters.competition_id} options={competitions} onChange={(competition_id) => updateFilters({ competition_id })} />
+              <Select label="Team" value={filters.team_id} options={teams} onChange={(team_id) => updateFilters({ team_id })} />
+              <SelectRaw label="Status" value={filters.status} options={["", "scheduled", "active", "live", "halftime", "finished", "postponed", "cancelled"]} onChange={(status) => updateFilters({ status })} />
+              <SelectRaw label="Verification" value={filters.verification} options={["", "verified", "pending", "problem"]} onChange={(verification) => updateFilters({ verification })} />
+              <SelectRaw label="Channel" value={filters.channel} options={["", "has", "missing"]} onChange={(channel) => updateFilters({ channel })} />
+              <SelectRaw label="Featured" value={filters.featured} options={["", "1", "0"]} onChange={(featured) => updateFilters({ featured })} />
+              <SelectRaw label="Stream health" value={filters.stream_status} options={["", "healthy", "missing", "problem"]} onChange={(stream_status) => updateFilters({ stream_status })} />
+            </div>
           </Panel>
 
           <Panel title="+ Quick Match">
@@ -980,11 +1077,14 @@ function MatchManager({ matches, teams, competitions, channels, run, adminGet, a
 
         <Panel title="Matches" action={<span className="text-sm text-neutral-400">{filterSummary}</span>}>
           {selectedIds.length > 0 ? (
-            <div className="mb-3 grid gap-2 rounded-md border border-white/10 bg-black/20 p-3 md:grid-cols-[1fr_1fr_1fr_auto]">
-              <SelectRaw label={`${selectedIds.length} selected`} value={bulkAction} options={["verify", "feature", "unfeature", "assign_competition", "set_status", "delete"]} onChange={setBulkAction} />
-              <Select label="Competition" value={bulkCompetition} options={competitions} onChange={setBulkCompetition} />
-              <SelectRaw label="Status" value={bulkStatus} options={["scheduled", "live", "halftime", "finished", "postponed", "cancelled"]} onChange={setBulkStatus} />
-              <button className="h-11 self-end rounded-md bg-red-600 px-4 text-sm font-semibold text-white" onClick={() => void applyBulkAction()}>Apply</button>
+            <div className="mb-3 rounded-md border border-white/10 bg-black/20 p-3">
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="min-w-44"><SelectRaw label={`${selectedIds.length} selected`} value={bulkAction} options={["publish", "unpublish", "verify", "feature", "unfeature", "assign_competition", "set_status", "delete"]} onChange={setBulkAction} /></div>
+                {bulkAction === "assign_competition" ? <div className="min-w-52"><Select label="Competition" value={bulkCompetition} options={competitions} onChange={setBulkCompetition} /></div> : null}
+                {bulkAction === "set_status" ? <div className="min-w-44"><SelectRaw label="Status" value={bulkStatus} options={["scheduled", "live", "halftime", "finished", "postponed", "cancelled"]} onChange={setBulkStatus} /></div> : null}
+                <button className="h-11 rounded-md bg-red-600 px-4 text-sm font-semibold text-white" onClick={() => void applyBulkAction()}>Apply</button>
+              </div>
+              {bulkActionError ? <p className="mt-2 text-sm text-red-200" role="alert">{bulkActionError}</p> : null}
             </div>
           ) : null}
           <div className="space-y-6">
@@ -1003,6 +1103,7 @@ function MatchManager({ matches, teams, competitions, channels, run, adminGet, a
                       run={run}
                       adminSend={adminSend}
                       refreshMatches={refreshMatches}
+                      onDelete={() => openDelete(match)}
                     />
                   ))}
                 </div>
@@ -1047,69 +1148,118 @@ function MatchManager({ matches, teams, competitions, channels, run, adminGet, a
           </div>
         </div>
       ) : null}
+      {deleteMatch ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-match-title">
+          <div className="w-full max-w-md rounded-lg border border-white/10 bg-neutral-900 p-5">
+            <h2 id="delete-match-title" className="text-lg font-semibold text-white">Delete match?</h2>
+            <p className="mt-3 font-medium text-white">{deleteMatch.home_team.name} vs {deleteMatch.away_team.name}</p>
+            <p className="text-sm text-neutral-400">{formatAdminMatchDateTime(deleteMatch)}</p>
+            <p className="mt-4 text-sm text-neutral-300">This action cannot be undone.</p>
+            {deleteError ? <p className="mt-3 rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-100" role="alert">{deleteError}</p> : null}
+            <div className="mt-5 flex justify-end gap-2">
+              <button className="h-10 rounded-md border border-white/10 px-4 text-sm text-white" disabled={deletePending} onClick={() => setDeleteMatch(null)}>Cancel</button>
+              <button className="h-10 rounded-md bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-50" disabled={deletePending} onClick={() => void confirmDelete()}>{deletePending ? "Deleting..." : "Delete Match"}</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {bulkDeleteOpen ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="bulk-delete-title">
+          <div className="w-full max-w-md rounded-lg border border-white/10 bg-neutral-900 p-5">
+            <h2 id="bulk-delete-title" className="text-lg font-semibold text-white">Delete {selectedIds.length} matches?</h2>
+            <p className="mt-3 text-sm text-neutral-300">This action cannot be undone. Confirm only if every selected fixture should be archived.</p>
+            {bulkActionError ? <p className="mt-3 rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-100" role="alert">{bulkActionError}</p> : null}
+            <div className="mt-5 flex justify-end gap-2">
+              <button className="h-10 rounded-md border border-white/10 px-4 text-sm text-white" onClick={() => setBulkDeleteOpen(false)}>Cancel</button>
+              <button className="h-10 rounded-md bg-red-600 px-4 text-sm font-semibold text-white" onClick={() => void confirmBulkDelete()}>Delete Matches</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function AdminMatchCard({ match, checked, onCheck, openControl, openAssign, run, adminSend, refreshMatches }: {
+function AdminMatchCard({ match, checked, onCheck, openControl, openAssign, onDelete, run, adminSend, refreshMatches }: {
   match: Match;
   checked: boolean;
   onCheck: () => void;
   openControl: (matchId: number) => void;
   openAssign: () => void;
+  onDelete: () => void;
   run: ManagerProps["run"];
   adminSend: ManagerProps["adminSend"];
   refreshMatches: () => Promise<void>;
 }) {
+  const [moreOpen, setMoreOpen] = useState(false);
   const channels = match.channels ?? [];
   const summary = match.admin?.stream_summary;
   const warnings = match.admin?.warnings ?? [];
+  const publication = match.publication ?? {
+    status: match.published_at ? "published" : "draft",
+    label: match.published_at ? "Published" : "Draft",
+    publicly_visible: Boolean(match.published_at),
+    block_reason: null,
+  };
   const score = match.status === "finished" || match.status === "live" || match.status === "halftime"
     ? `${match.home_score ?? 0} - ${match.away_score ?? 0}`
     : "vs";
+  const healthLabel = summary ? `${summary.healthy_sources} / ${summary.enabled_sources} healthy` : "Not configured";
+
+  function runSecondary(action: () => Promise<void>, success: string) {
+    setMoreOpen(false);
+    void run(action, success);
+  }
 
   return (
-    <article className="rounded-lg border border-white/10 bg-black/20 p-3">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-[28px_72px_minmax(0,1fr)_auto] sm:items-start">
+    <article className="rounded-lg border border-white/10 bg-black/20 p-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-[28px_72px_minmax(0,1fr)] sm:items-start">
           <input aria-label={`Select ${match.home_team.name} vs ${match.away_team.name}`} type="checkbox" checked={checked} onChange={onCheck} className="mt-1" />
-          <div className="text-sm font-semibold tabular-nums text-white">{adminClock(match)}</div>
+          <div className="text-base font-semibold tabular-nums text-white">{adminClock(match)}</div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-semibold uppercase text-neutral-400">{match.competition.name}</span>
               <AdminBadge tone={statusTone(match.status)}>{match.status_label ?? labelize(match.status)}</AdminBadge>
-              {match.featured ? <AdminBadge tone="cyan">Featured</AdminBadge> : null}
               <AdminBadge tone={verificationTone(match.verification_status)}>{match.admin?.verification_label ?? "Pending verification"}</AdminBadge>
+              <AdminBadge tone={publicationTone(publication.status)}>{publication.label}</AdminBadge>
+              {match.featured ? <span className="inline-flex items-center text-yellow-300" title="Featured"><Star className="h-4 w-4 fill-current" aria-hidden="true" /><span className="sr-only">Featured</span></span> : null}
             </div>
-            <h4 className="mt-1 truncate text-base font-semibold text-white">{match.home_team.name} <span className="text-neutral-500">{score}</span> {match.away_team.name}</h4>
-            <div className="mt-2 flex flex-wrap gap-2 text-xs text-neutral-400">
-              <span>Channels: {summary?.channels ?? channels.length}</span>
-              <span>Sources: {summary?.healthy_sources ?? 0}/{summary?.enabled_sources ?? 0} healthy</span>
-              <span>Stream opens {adminClock({ kickoff_at: match.stream_available_from ?? match.playback_window?.opens_at ?? null, scheduled_date: null })}</span>
+            <h4 className="mt-1 text-base font-semibold text-white">{match.home_team.name} <span className="text-neutral-500">{score}</span> {match.away_team.name}</h4>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-400">
+              <span>Broadcast: {summary?.channels ?? channels.length} channels</span>
+              <span className={summary && summary.healthy_sources === 0 && (match.status === "live" || match.status === "halftime") ? "font-semibold text-red-200" : ""}>Streams: {healthLabel}</span>
+              <span>Opens {adminClock({ kickoff_at: match.stream_available_from ?? match.playback_window?.opens_at ?? null, scheduled_date: null })}</span>
               <span>Closes {adminClock({ kickoff_at: match.stream_closes_at ?? match.playback_window?.closes_at ?? null, scheduled_date: null })}</span>
             </div>
             {channels.length > 0 ? (
-              <div className="mt-2 flex flex-wrap gap-1">
-                {channels.slice(0, 4).map((channel, index) => <AdminBadge key={channel.id} tone={index === 0 ? "green" : "neutral"}>{index === 0 ? "Primary: " : ""}{String(channel.name)}</AdminBadge>)}
-                {channels.length > 4 ? <AdminBadge tone="neutral">+{channels.length - 4}</AdminBadge> : null}
+              <div className="mt-2 flex flex-wrap gap-2 text-xs text-neutral-300">
+                <span className="font-semibold text-white">Primary: {String(channels[0]?.name ?? "Not assigned")}</span>
+                {channels.length > 1 ? <span>+{channels.length - 1} backup channels</span> : null}
               </div>
             ) : null}
             {warnings.length > 0 ? (
-              <div className="mt-2 grid gap-1">
-                {warnings.slice(0, 3).map((warning) => <span key={warning} className="text-xs font-medium text-yellow-100">{warning}</span>)}
+              <div className="mt-2 flex flex-wrap gap-1">
+                {warnings.slice(0, 2).map((warning) => <span key={warning} className="text-xs font-medium text-yellow-100">{warning}</span>)}
               </div>
             ) : null}
           </div>
         </div>
-        <div className="flex flex-wrap gap-2 lg:max-w-xs lg:justify-end">
+        <div className="flex shrink-0 flex-wrap gap-2 lg:max-w-[220px] lg:justify-end">
           <button className="h-9 rounded-md bg-red-600 px-3 text-xs font-semibold text-white" onClick={() => openControl(match.id)}>Manage</button>
-          <button className="h-9 rounded-md border border-white/10 px-3 text-xs text-white" onClick={openAssign}>Assign Channel</button>
-          <button className="h-9 rounded-md border border-white/10 px-3 text-xs text-white" onClick={() => run(async () => { await adminSend(`/admin/matches/${match.id}/control/feature`, "PATCH", { featured: !match.featured }); await refreshMatches(); }, match.featured ? "Match unfeatured" : "Match featured")}>{match.featured ? "Unfeature" : "Feature"}</button>
-          {["live", "halftime", "finished", "postponed"].map((status) => (
-            <button key={status} className="h-9 rounded-md border border-white/10 px-3 text-xs text-white" onClick={() => run(async () => { await adminSend(`/admin/matches/${match.id}/control/status`, "PATCH", { status, override_transition: true }); await refreshMatches(); }, `Marked ${status}`)}>{labelize(status)}</button>
-          ))}
-          <button className="h-9 rounded-md border border-white/10 px-3 text-xs text-white" onClick={() => run(async () => { await adminSend(`/admin/matches/${match.id}/duplicate`, "POST"); await refreshMatches(); }, "Match duplicated")}>Duplicate</button>
-          <button className="h-9 rounded-md border border-red-500/30 px-3 text-xs text-red-200" onClick={() => { if (window.confirm("Archive this match?")) void run(async () => { await adminSend(`/admin/matches/${match.id}`, "DELETE"); await refreshMatches(); }, "Match archived"); }}>Delete</button>
+          <button className="h-9 rounded-md border border-white/10 px-3 text-xs text-white" onClick={openAssign}><Radio className="mr-1 inline h-3.5 w-3.5" />Channels</button>
+          <div className="relative">
+            <button className="grid h-9 w-9 place-items-center rounded-md border border-white/10 text-white" aria-label="More match actions" aria-expanded={moreOpen} title="More actions" onClick={() => setMoreOpen((open) => !open)}><MoreHorizontal className="h-4 w-4" /></button>
+            {moreOpen ? (
+              <div className="absolute right-0 top-11 z-20 grid min-w-44 gap-1 rounded-md border border-white/10 bg-neutral-900 p-1 shadow-xl">
+                <button className="rounded px-3 py-2 text-left text-xs text-white hover:bg-white/10" onClick={() => runSecondary(async () => { await adminSend(`/admin/matches/${match.id}/control/feature`, "PATCH", { featured: !match.featured }); await refreshMatches(); }, match.featured ? "Match unfeatured" : "Match featured")}>{match.featured ? "Unfeature" : "Feature"}</button>
+                <button className="rounded px-3 py-2 text-left text-xs text-white hover:bg-white/10" onClick={() => runSecondary(async () => { await adminSend(`/admin/matches/${match.id}/publication`, "PATCH", { published: publication.status !== "published" }); await refreshMatches(); }, publication.status === "published" ? "Match unpublished" : "Match published")}>{publication.status === "published" ? "Unpublish" : "Publish"}</button>
+                {["live", "halftime", "finished", "postponed", "cancelled"].map((status) => <button key={status} className="rounded px-3 py-2 text-left text-xs text-white hover:bg-white/10" onClick={() => runSecondary(async () => { await adminSend(`/admin/matches/${match.id}/control/status`, "PATCH", { status, override_transition: true }); await refreshMatches(); }, `Marked ${status}`)}>{labelize(status)}</button>)}
+                <button className="rounded px-3 py-2 text-left text-xs text-white hover:bg-white/10" onClick={() => runSecondary(async () => { await adminSend(`/admin/matches/${match.id}/duplicate`, "POST"); await refreshMatches(); }, "Match duplicated")}>Duplicate</button>
+                <button className="rounded px-3 py-2 text-left text-xs text-red-200 hover:bg-red-500/10" onClick={() => { setMoreOpen(false); onDelete(); }}>Delete</button>
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
     </article>
@@ -1183,10 +1333,25 @@ function statusTone(status: string): "red" | "yellow" | "green" | "cyan" | "neut
   return "neutral";
 }
 
+function publicationTone(status: "draft" | "published" | "hidden"): "red" | "yellow" | "green" | "cyan" | "neutral" {
+  if (status === "published") return "green";
+  if (status === "hidden") return "red";
+  return "neutral";
+}
+
 function verificationTone(status?: string): "red" | "yellow" | "green" | "cyan" | "neutral" {
   if (status === "verified" || status === "manual_verified") return "green";
   if (status === "pending_verification") return "yellow";
   return "red";
+}
+
+function formatAdminMatchDateTime(match: Pick<Match, "kickoff_at" | "scheduled_date">): string {
+  const date = match.kickoff_at ? new Date(match.kickoff_at) : match.scheduled_date ? new Date(`${match.scheduled_date}T12:00:00Z`) : null;
+
+  if (!date) return "Date TBC";
+  if (!match.kickoff_at) return adminDateFormatter.format(date);
+
+  return `${adminDateFormatter.format(date)} • ${adminTimeFormatter.format(date)}`;
 }
 
 function MatchControlCenter({ matches, channels, control, selectedId, onSelectMatch, loadControl, run, adminSend }: ManagerProps & { matches: Match[]; channels: Entity[]; control: MatchControl | null; selectedId: number | null; onSelectMatch: (matchId: number) => void; loadControl: (matchId: number) => Promise<void> }) {
@@ -1212,11 +1377,12 @@ function MatchControlCenter({ matches, channels, control, selectedId, onSelectMa
       <Panel title="Match Picker">
         <Select label="Match" value={String(selectedId ?? "")} options={matches} onChange={(value) => onSelectMatch(Number(value))} />
         {selected ? (
-          <div className="grid gap-2 text-sm text-neutral-300">
-            <span>{selected.competition.name}</span>
-            <span>Kickoff: {selected.kickoff_at ?? selected.scheduled_date ?? "TBC"}</span>
-            <span>Status: {selected.status}</span>
-            <span>Playback: {control?.playback_window.status ?? "unknown"}</span>
+            <div className="grid gap-2 text-sm text-neutral-300">
+              <span>{selected.competition.name}</span>
+              <span>Kickoff: {selected.kickoff_at ?? selected.scheduled_date ?? "TBC"}</span>
+              <span>Status: {selected.status}</span>
+              <span>Publication: {selected.publication?.label ?? (selected.published_at ? "Published" : "Draft")}</span>
+              <span>Playback: {control?.playback_window.status ?? "unknown"}</span>
           </div>
         ) : <Empty message="Choose a match to load the control center." />}
       </Panel>
@@ -1258,6 +1424,10 @@ function MatchControlCenter({ matches, channels, control, selectedId, onSelectMa
               ))}
             </div>
             <Toggle label="Featured" checked={selected.featured} onChange={(featured) => void run(async () => { await adminSend(`/admin/matches/${selected.id}/control/feature`, "PATCH", { featured }); await loadControl(selected.id); }, featured ? "Match featured" : "Match unfeatured")} />
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-white/10 bg-black/20 p-3 text-sm text-neutral-300">
+              <span>Public visibility: {selected.publication?.publicly_visible ? "Published" : selected.publication?.label ?? "Draft"}</span>
+              <button className="h-9 rounded-md border border-white/10 px-3 text-xs text-white" onClick={() => run(async () => { await adminSend(`/admin/matches/${selected.id}/publication`, "PATCH", { published: selected.publication?.status !== "published" }); await loadControl(selected.id); }, selected.publication?.status === "published" ? "Match unpublished" : "Match published")}>{selected.publication?.status === "published" ? "Unpublish" : "Publish"}</button>
+            </div>
           </Panel>
           <Panel title="IPTV Channel Assignment">
             <div className="flex flex-wrap gap-2">
@@ -1291,6 +1461,12 @@ function MatchControlCenter({ matches, channels, control, selectedId, onSelectMa
                 </div>
               ))}
               {(control?.assigned_channels ?? []).length === 0 ? <Empty message="No IPTV channels assigned yet." /> : null}
+            </div>
+          </Panel>
+          <Panel title="Audit History">
+            <div className="grid gap-2">
+              {(control?.audit_history ?? []).map((entry) => <CardLine key={entry.id} title={labelize(entry.action)} meta={`${entry.actor?.name ?? "System"} | ${entry.created_at ?? ""}`} />)}
+              {(control?.audit_history ?? []).length === 0 ? <Empty message="No match-specific audit history yet." /> : null}
             </div>
           </Panel>
         </div>
@@ -1589,6 +1765,7 @@ type ManagerProps = {
   run: (action: () => Promise<void>, success: string) => Promise<void>;
   adminSend: <T>(path: string, method: string, body?: unknown) => Promise<T>;
   adminGet?: <T>(path: string, signal?: AbortSignal) => Promise<T>;
+  notifySuccess?: (message: string) => void;
 };
 function Panel({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) { return <section className="rounded-lg border border-white/10 bg-neutral-900 p-4"><div className="mb-4 flex items-center justify-between gap-3"><h2 className="font-semibold text-white">{title}</h2>{action}</div><div className="space-y-3">{children}</div></section>; }
 function Stat({ label, value }: { label: string; value: number }) { return <div className="rounded-lg border border-white/10 bg-neutral-900 p-4"><span className="text-sm capitalize text-neutral-400">{label}</span><strong className="mt-2 block text-2xl text-white">{value}</strong></div>; }
@@ -1598,7 +1775,29 @@ function SelectRaw({ label, value, options, onChange }: { label: string; value: 
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) { return <label className="flex h-11 items-center justify-between rounded-md border border-white/10 bg-black/30 px-3 text-sm text-neutral-300">{label}<input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} /></label>; }
 function ScoreStepper({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) { return <div className="rounded-lg border border-white/10 bg-black/20 p-4 text-center"><p className="font-semibold text-white">{label}</p><strong className="block py-3 text-4xl text-white">{value}</strong><div className="grid grid-cols-2 gap-2"><button className="h-12 rounded-md bg-neutral-800" onClick={() => onChange(Math.max(0, value - 1))}>-</button><button className="h-12 rounded-md bg-red-600" onClick={() => onChange(value + 1)}>+</button></div></div>; }
 function MatchRows({ matches, controls = false, onControl }: { matches: Match[]; controls?: boolean; onControl?: (matchId: number) => void }) { return <div className="grid gap-2">{matches.length ? matches.map((match) => <CardLine key={match.id} title={`${match.home_team.name} ${match.home_score ?? "-"} - ${match.away_score ?? "-"} ${match.away_team.name}`} meta={`${match.competition.name} | ${match.status} | ${match.minute ?? ""}`} action={controls ? <button className="h-9 rounded-md bg-red-600 px-3 text-xs font-semibold text-white" onClick={() => onControl?.(match.id)}>Control</button> : undefined} />) : <Empty message="No matches here yet." />}</div>; }
-function ReadinessRows({ matches, readiness }: { matches: Match[]; readiness: Record<string, Readiness> }) { return <div className="grid gap-2">{matches.length ? matches.map((match) => { const state = readiness[String(match.id)]; return <CardLine key={match.id} title={`${match.home_team.name} vs ${match.away_team.name}`} meta={`${match.status} | ${state?.state ?? "unknown"} | ${state?.source_count ?? 0} sources | healthy ${state?.healthy_source ? "yes" : "no"}`} action={<span className={`rounded-md px-2 py-1 text-xs font-semibold ${state?.state === "ready" ? "bg-green-500/15 text-green-200" : state?.state === "critical" ? "bg-red-500/15 text-red-200" : "bg-yellow-500/15 text-yellow-100"}`}>{state?.state ?? "unknown"}</span>} />; }) : <Empty message="No matches in this bucket." />}</div>; }
+function ReadinessRows({ matches, readiness, onManage, onChannels, onGoLive }: { matches: Match[]; readiness: Record<string, Readiness>; onManage: (matchId: number) => void; onChannels: (matchId: number) => void; onGoLive?: (matchId: number) => void }) {
+  if (!matches.length) return <Empty message="No matches in this bucket." />;
+
+  return <div className="grid gap-2">{matches.map((match) => {
+    const state = readiness[String(match.id)];
+    const tone = state?.state === "ready" ? "green" : state?.state === "critical" ? "red" : state?.state === "warning" ? "yellow" : "neutral";
+
+    return (
+      <article key={match.id} className="flex flex-col gap-3 rounded-md border border-white/10 bg-black/20 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-neutral-400"><span className="font-semibold tabular-nums text-white">{adminClock(match)}</span><AdminBadge tone={statusTone(match.status)}>{match.status_label ?? labelize(match.status)}</AdminBadge><AdminBadge tone={tone}>{labelize(state?.state ?? "normal")}</AdminBadge></div>
+          <strong className="mt-1 block text-sm text-white">{match.home_team.name} vs {match.away_team.name}</strong>
+          <span className="text-xs text-neutral-400">{match.competition.name} | {state?.channels ?? 0} channels | {state?.source_count ?? 0} enabled sources | {state?.healthy_source ? "healthy stream" : "no healthy stream"}</span>
+        </div>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <button className="h-9 rounded-md bg-red-600 px-3 text-xs font-semibold text-white" onClick={() => onManage(match.id)}>Manage</button>
+          <button className="h-9 rounded-md border border-white/10 px-3 text-xs text-white" onClick={() => onChannels(match.id)}>Channels</button>
+          {onGoLive && match.status === "scheduled" ? <button className="h-9 rounded-md border border-white/10 px-3 text-xs text-white" onClick={() => onGoLive(match.id)}>Go Live</button> : null}
+        </div>
+      </article>
+    );
+  })}</div>;
+}
 function SyncRunRows({ syncRuns }: { syncRuns: SyncRun[] }) { return <div className="grid gap-2">{syncRuns.length ? syncRuns.map((run) => <CardLine key={run.id} title={`${run.type} - ${run.status}`} meta={`created ${run.created_count} | updated ${run.updated_count} | ignored ${run.ignored_count} | failed ${run.failed_count}`} />) : <Empty message="No sync runs yet." />}</div>; }
 function EntityGrid({ items }: { items: Entity[] }) { return <div className="grid gap-2 md:grid-cols-2">{items.map((item) => <CardLine key={item.id} title={String(item.name ?? item.title ?? item.slug)} meta={String(item.slug ?? item.short_name ?? "")} />)}</div>; }
 function CardLine({ title, meta, action }: { title: string; meta: string; action?: ReactNode }) { return <div className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-black/20 p-3"><div className="min-w-0"><strong className="block truncate text-white">{title}</strong><span className="text-sm text-neutral-400">{meta}</span></div>{action}</div>; }

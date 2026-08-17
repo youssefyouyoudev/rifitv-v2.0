@@ -3,7 +3,9 @@
 namespace App\Http\Resources;
 
 use App\Enums\MatchStatus;
+use App\Enums\MatchVisibility;
 use App\Models\Channel;
+use App\Services\MatchDateWindowService;
 use App\Services\PlaybackWindowService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -46,6 +48,7 @@ class MatchResource extends JsonResource
             'featured' => $this->featured,
             'published_at' => $this->published_at?->toIso8601String(),
             'visibility' => $this->visibility?->value,
+            'publication' => $this->publicationState(),
             'seo_title' => $this->seo_title,
             'seo_description' => $this->seo_description,
             'notes' => $this->notes,
@@ -73,6 +76,28 @@ class MatchResource extends JsonResource
             'pending_verification' => 'Pending verification',
             default => 'Needs review',
         };
+    }
+
+    /** @return array{status:string,label:string,publicly_visible:bool,block_reason:?string} */
+    private function publicationState(): array
+    {
+        $published = $this->published_at !== null;
+        $public = $this->visibility === MatchVisibility::Public;
+        $verified = in_array((string) $this->verification_status, ['verified', 'manual_verified'], true);
+        $publiclyVisible = $published && $public && $verified;
+        $status = ! $published ? 'draft' : ($public ? 'published' : 'hidden');
+        $blockReason = $publiclyVisible ? null : ($published && $public && ! $verified ? 'verification_pending' : null);
+
+        return [
+            'status' => $status,
+            'label' => match ($status) {
+                'published' => $blockReason ? 'Published, awaiting verification' : 'Published',
+                'hidden' => 'Hidden',
+                default => 'Draft',
+            },
+            'publicly_visible' => $publiclyVisible,
+            'block_reason' => $blockReason,
+        ];
     }
 
     /** @return array<string,int> */
@@ -103,18 +128,27 @@ class MatchResource extends JsonResource
         $warnings = [];
         $summary = $this->streamSummary();
         $now = now();
+        $dateWindow = app(MatchDateWindowService::class);
+        $today = $dateWindow->today();
+        $matchDate = $this->kickoff_at
+            ? $dateWindow->dateForInstant($this->kickoff_at)
+            : $this->scheduled_date?->toDateString();
 
         if ($this->kickoff_at && $this->status === MatchStatus::Scheduled && $now->lte($this->kickoff_at) && $now->diffInMinutes($this->kickoff_at, false) <= 30 && $summary['channels'] === 0) {
             $warnings[] = 'Match starts in 30 min but has no channel';
+        }
+
+        if ($this->kickoff_at && $this->status === MatchStatus::Scheduled && $now->lte($this->kickoff_at) && $now->diffInMinutes($this->kickoff_at, false) <= 30 && $summary['channels'] > 0 && $summary['healthy_sources'] === 0) {
+            $warnings[] = 'Match starts in 30 min but has no healthy stream';
         }
 
         if (in_array($this->status, [MatchStatus::Live, MatchStatus::Halftime], true) && $summary['healthy_sources'] === 0) {
             $warnings[] = 'Match is live but no healthy stream source exists';
         }
 
-        if ($this->verification_status === 'pending_verification') {
+        if ($this->verification_status === 'pending_verification' && $matchDate === $today) {
             $warnings[] = 'Fixture pending verification';
-        } elseif (! in_array((string) $this->verification_status, ['verified', 'manual_verified'], true)) {
+        } elseif ($matchDate === $today && ! in_array((string) $this->verification_status, ['verified', 'manual_verified', 'pending_verification'], true)) {
             $warnings[] = 'Fixture needs review';
         }
 

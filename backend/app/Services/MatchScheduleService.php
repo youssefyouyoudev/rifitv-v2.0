@@ -3,9 +3,11 @@
 namespace App\Services;
 
 use App\Enums\MatchStatus;
+use App\Enums\MatchVisibility;
 use App\Models\GameMatch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class MatchScheduleService
 {
@@ -36,12 +38,11 @@ class MatchScheduleService
     /** @return array<string,mixed> */
     public function adminMeta(Request $request): array
     {
-        $base = GameMatch::query();
         $timezone = $this->timezone();
-        $today = $this->dateWindow->today();
 
         return [
             'timezone' => $timezone,
+            'counter_labels' => $this->counterLabels(),
             'filters' => [
                 'date' => $request->string('date')->toString() ?: null,
                 'competition' => $request->string('competition')->toString() ?: null,
@@ -60,16 +61,51 @@ class MatchScheduleService
                 'label' => $status->label(),
                 'rank' => $status->scheduleRank(),
             ])->values()->all(),
-            'counters' => [
-                'today' => (clone $base)->onLocalDate($today, $timezone)->count(),
-                'live' => (clone $base)->whereIn('status', [MatchStatus::Live->value, MatchStatus::Halftime->value])->count(),
-                'upcoming' => (clone $base)->where('status', MatchStatus::Scheduled->value)->where('kickoff_at', '>=', now())->count(),
-                'finished' => (clone $base)->where('status', MatchStatus::Finished->value)->count(),
-                'needs_channel' => (clone $base)->doesntHave('channels')->count(),
-                'needs_verification' => (clone $base)->where('verification_status', 'pending_verification')->count(),
-                'featured' => (clone $base)->where('featured', true)->count(),
-            ],
+            'counters' => $this->counters(),
             'attention' => $this->attentionMatches($request),
+        ];
+    }
+
+    /** @return array<string,int> */
+    public function counters(): array
+    {
+        $base = GameMatch::query();
+        $now = now();
+        $today = $this->dateWindow->today();
+        $upcomingDays = max(1, (int) config('rifitv.admin_upcoming_days', 7));
+
+        return [
+            'today' => (clone $base)->onLocalDate($today)->count(),
+            'live' => (clone $base)->whereIn('status', [MatchStatus::Live->value, MatchStatus::Halftime->value])->count(),
+            'upcoming' => $this->withinUpcomingHorizon((clone $base)->where('status', MatchStatus::Scheduled->value), $now, $today, $upcomingDays)->count(),
+            'finished' => (clone $base)->where('status', MatchStatus::Finished->value)->count(),
+            'needs_channel' => (clone $base)
+                ->whereIn('status', [MatchStatus::Scheduled->value, MatchStatus::Live->value, MatchStatus::Halftime->value])
+                ->where(function (Builder $query) use ($now, $today, $upcomingDays): void {
+                    $query
+                        ->where(fn (Builder $published) => $published->whereNotNull('published_at')->where('visibility', MatchVisibility::Public))
+                        ->orWhere(fn (Builder $upcoming) => $this->withinUpcomingHorizon($upcoming->where('status', MatchStatus::Scheduled->value), $now, $today, $upcomingDays));
+                })
+                ->doesntHave('channels')
+                ->count(),
+            'needs_verification' => (clone $base)->whereIn('verification_status', ['pending_verification', 'problem'])->count(),
+            'featured' => (clone $base)->where('featured', true)->count(),
+        ];
+    }
+
+    /** @return array<string,string> */
+    public function counterLabels(): array
+    {
+        $days = max(1, (int) config('rifitv.admin_upcoming_days', 7));
+
+        return [
+            'today' => 'Today',
+            'live' => 'Live now',
+            'upcoming' => "Upcoming {$days} days",
+            'finished' => 'Finished (all)',
+            'needs_channel' => "Needs channel ({$days} days)",
+            'needs_verification' => 'Needs verification',
+            'featured' => 'Featured',
         ];
     }
 
@@ -81,14 +117,14 @@ class MatchScheduleService
         $soon = $now->copy()->addMinutes((int) config('rifitv.missing_broadcast_alert_minutes', 30));
         $today = $this->dateWindow->today();
 
-        $liveWithoutStream = $this->applyContextFilters(GameMatch::query()->publicGraph(), $request)
+        $liveWithoutStream = $this->applyContextFilters(GameMatch::query()->publicGraph(), $request, false)
             ->whereIn('status', [MatchStatus::Live->value, MatchStatus::Halftime->value])
             ->whereDoesntHave('channels.streamSources', fn (Builder $query) => $query->where('enabled', true)->where('last_known_status', 'healthy'))
             ->scheduleOrder()
             ->limit(5)
             ->get();
 
-        $soonWithoutChannel = $this->applyContextFilters(GameMatch::query()->publicGraph(), $request)
+        $soonWithoutChannel = $this->applyContextFilters(GameMatch::query()->publicGraph(), $request, false)
             ->where('status', MatchStatus::Scheduled->value)
             ->whereBetween('kickoff_at', [$now, $soon])
             ->doesntHave('channels')
@@ -96,27 +132,38 @@ class MatchScheduleService
             ->limit(5)
             ->get();
 
-        $todayPending = GameMatch::query()->publicGraph()
-            ->onLocalDate($today, $timezone)
-            ->where('verification_status', 'pending_verification')
+        $soonWithoutStream = $this->applyContextFilters(GameMatch::query()->publicGraph(), $request, false)
+            ->where('status', MatchStatus::Scheduled->value)
+            ->whereBetween('kickoff_at', [$now, $soon])
+            ->whereHas('channels')
+            ->whereDoesntHave('channels.streamSources', fn (Builder $query) => $query->where('enabled', true)->where('last_known_status', 'healthy'))
             ->scheduleOrder()
             ->limit(5)
             ->get();
 
-        $upcomingWithoutChannel = $this->applyContextFilters(GameMatch::query()->publicGraph(), $request)
-            ->where('status', MatchStatus::Scheduled->value)
-            ->where('kickoff_at', '>=', $now)
-            ->doesntHave('channels')
+        $todayPending = $this->applyContextFilters(GameMatch::query()->publicGraph(), $request, false)
+            ->onLocalDate($today, $timezone)
+            ->whereIn('verification_status', ['pending_verification', 'problem'])
             ->scheduleOrder()
             ->limit(5)
             ->get();
+
+        $conflicts = $this->applyContextFilters(GameMatch::query()->publicGraph(), $request, false)
+            ->whereNotNull('kickoff_at')
+            ->whereNotNull('scheduled_date')
+            ->scheduleOrder()
+            ->limit(100)
+            ->get()
+            ->filter(fn (GameMatch $match): bool => $match->kickoff_at?->timezone($timezone)->toDateString() !== $match->scheduled_date?->toDateString())
+            ->take(5);
 
         return $liveWithoutStream
             ->concat($soonWithoutChannel)
+            ->concat($soonWithoutStream)
             ->concat($todayPending)
-            ->concat($upcomingWithoutChannel)
+            ->concat($conflicts)
             ->unique('id')
-            ->take(12)
+            ->take(5)
             ->values()
             ->all();
     }
@@ -163,14 +210,14 @@ class MatchScheduleService
     }
 
     /** @param Builder<GameMatch> $query */
-    private function applyContextFilters(Builder $query, Request $request): Builder
+    private function applyContextFilters(Builder $query, Request $request, bool $includeDate = true): Builder
     {
         $timezone = $this->timezone();
         $requestedDate = $request->string('date')->toString();
         $date = $requestedDate === '' ? '' : $this->dateWindow->normalizeDate($requestedDate);
 
         return $query
-            ->when($date !== '', fn (Builder $query) => $query->onLocalDate($date, $timezone))
+            ->when($includeDate && $date !== '', fn (Builder $query) => $query->onLocalDate($date, $timezone))
             ->when($request->string('competition')->isNotEmpty(), fn (Builder $query) => $query->whereHas('competition', fn (Builder $competition) => $competition->where('slug', $request->string('competition'))))
             ->when($request->filled('competition_id'), fn (Builder $query) => $query->where('competition_id', $request->integer('competition_id')))
             ->when($request->string('team')->isNotEmpty(), function (Builder $query) use ($request): void {
@@ -184,9 +231,11 @@ class MatchScheduleService
                 $search = $request->string('search')->toString();
                 $query->where(fn (Builder $searchQuery) => $searchQuery
                     ->where('slug', 'like', "%{$search}%")
+                    ->when(is_numeric($search), fn (Builder $numericQuery) => $numericQuery->orWhereKey((int) $search))
                     ->orWhereHas('competition', fn (Builder $competition) => $competition->where('name', 'like', "%{$search}%")->orWhere('slug', 'like', "%{$search}%"))
                     ->orWhereHas('homeTeam', fn (Builder $team) => $team->where('name', 'like', "%{$search}%")->orWhere('slug', 'like', "%{$search}%"))
-                    ->orWhereHas('awayTeam', fn (Builder $team) => $team->where('name', 'like', "%{$search}%")->orWhere('slug', 'like', "%{$search}%")));
+                    ->orWhereHas('awayTeam', fn (Builder $team) => $team->where('name', 'like', "%{$search}%")->orWhere('slug', 'like', "%{$search}%"))
+                    ->orWhereHas('channels', fn (Builder $channel) => $channel->where('name', 'like', "%{$search}%")->orWhere('slug', 'like', "%{$search}%")));
             })
             ->when($request->string('territory')->isNotEmpty(), fn (Builder $query) => $query->whereHas('broadcasts', fn (Builder $broadcast) => $broadcast->where('territory', $request->string('territory')->toString())));
     }
@@ -194,5 +243,17 @@ class MatchScheduleService
     private function timezone(): string
     {
         return $this->dateWindow->timezone();
+    }
+
+    private function withinUpcomingHorizon(Builder $query, Carbon $now, string $today, int $days): Builder
+    {
+        $lastDate = $this->dateWindow->addDays($today, $days);
+        $horizon = $now->copy()->addDays($days);
+
+        return $query->where(function (Builder $future) use ($now, $horizon, $today, $lastDate): void {
+            $future
+                ->whereBetween('kickoff_at', [$now, $horizon])
+                ->orWhere(fn (Builder $dateOnly) => $dateOnly->whereNull('kickoff_at')->whereBetween('scheduled_date', [$today, $lastDate]));
+        });
     }
 }

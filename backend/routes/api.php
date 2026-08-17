@@ -64,6 +64,7 @@ Route::prefix('v1')->group(function (): void {
 
             Route::post('matches/bulk', [AdminMatchController::class, 'bulk']);
             Route::post('matches/{match}/duplicate', [AdminMatchController::class, 'duplicate']);
+            Route::patch('matches/{match}/publication', [AdminMatchController::class, 'publication']);
             Route::patch('matches/{match}/live-control', [AdminMatchController::class, 'liveControl']);
             Route::get('matches/{match}/control', [AdminMatchControlController::class, 'show']);
             Route::post('matches/{match}/control/channels', [AdminMatchControlController::class, 'assignChannels']);

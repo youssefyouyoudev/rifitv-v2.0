@@ -130,15 +130,7 @@ class GameMatch extends Model
         return $query
             ->whereNotNull('published_at')
             ->where('visibility', MatchVisibility::Public)
-            ->where(function (Builder $publicationQuery): void {
-                $publicationQuery
-                    ->whereIn('verification_status', ['verified', 'manual_verified'])
-                    ->orWhere(function (Builder $manualQuery): void {
-                        $manualQuery
-                            ->whereIn('source_provider', ['manual', 'manual-admin', 'manual-copy'])
-                            ->where('verification_status', 'pending_verification');
-                    });
-            });
+            ->whereIn('verification_status', ['verified', 'manual_verified']);
     }
 
     public function scopeOnLocalDate(Builder $query, string $date, ?string $timezone = null): Builder

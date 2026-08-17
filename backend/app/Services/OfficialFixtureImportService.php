@@ -142,14 +142,14 @@ class OfficialFixtureImportService
                 foreach ($dataset['fixtures'] as $fixture) {
                     $home = $this->team($fixture['home_team'], $dataset['competition']['country_code']);
                     $away = $this->team($fixture['away_team'], $dataset['competition']['country_code']);
-                    $featured = $this->isFeaturedFixture($competition->slug, $home->name, $away->name);
+                    $selectedFixture = $this->isFeaturedFixture($competition->slug, $home->name, $away->name);
 
-                    if ($featured) {
+                    if ($selectedFixture) {
                         $featuredTeamIds[$home->id] = ['sort_order' => count($featuredTeamIds) + 1];
                         $featuredTeamIds[$away->id] = ['sort_order' => count($featuredTeamIds) + 1];
                     }
 
-                    $match = $this->match($competition, $season, $home, $away, $fixture, $featured);
+                    $match = $this->match($competition, $season, $home, $away, $fixture);
                     $this->broadcast($match, $broadcaster, $fixture);
 
                     $summary['matches']++;
@@ -284,7 +284,7 @@ class OfficialFixtureImportService
     }
 
     /** @param array<string, mixed> $fixture */
-    private function match(Competition $competition, Season $season, Team $home, Team $away, array $fixture, bool $featured): GameMatch
+    private function match(Competition $competition, Season $season, Team $home, Team $away, array $fixture): GameMatch
     {
         $precision = $this->kickoffPrecision((string) ($fixture['kickoff_status'] ?? 'tbc'));
         $kickoffAt = null;
@@ -325,9 +325,9 @@ class OfficialFixtureImportService
             'home_score' => null,
             'away_score' => null,
             'minute' => null,
-            'featured' => $featured,
-            'published_at' => $featured && $verified ? now() : null,
-            'visibility' => $featured && $verified ? MatchVisibility::Public : MatchVisibility::Internal,
+            'featured' => false,
+            'published_at' => $verified ? now() : null,
+            'visibility' => $verified ? MatchVisibility::Public : MatchVisibility::Internal,
             'seo_title' => "{$home->name} vs {$away->name} - {$competition->name}",
             'seo_description' => "{$home->name} vs {$away->name} {$competition->name} fixture information on RiFiTV.",
             'slug' => Str::slug(Str::ascii("{$home->name} vs {$away->name} {$competition->slug} {$season->slug} {$fixture['external_id']}")),

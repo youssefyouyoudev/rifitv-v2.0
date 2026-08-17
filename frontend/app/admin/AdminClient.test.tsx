@@ -2,8 +2,11 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AdminClient } from "./AdminClient";
 
+const pathnameState = vi.hoisted(() => ({ value: "/admin" }));
+
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/admin",
+  usePathname: () => pathnameState.value,
+  useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({
     push: vi.fn(),
     replace: vi.fn(),
@@ -71,6 +74,7 @@ function mockLoginFlow(loginResponse: Response) {
 
 describe("AdminClient", () => {
   beforeEach(() => {
+    pathnameState.value = "/admin";
     mockGuest();
   });
 
@@ -140,5 +144,93 @@ describe("AdminClient", () => {
 
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("requires confirmation in a local delete modal before sending the archive request", async () => {
+    pathnameState.value = "/admin/matches";
+    const match = {
+      id: 7,
+      slug: "rc-deportivo-vs-elche",
+      home_team: { id: 1, name: "RC Deportivo" },
+      away_team: { id: 2, name: "Elche CF" },
+      competition: { id: 1, name: "LALIGA EA SPORTS" },
+      status: "scheduled",
+      status_label: "Scheduled",
+      home_score: null,
+      away_score: null,
+      minute: null,
+      featured: false,
+      published_at: "2026-08-17T18:00:00Z",
+      kickoff_at: "2026-08-17T19:00:00Z",
+      scheduled_date: "2026-08-17",
+      verification_status: "manual_verified",
+      channels: [],
+      playback_window: { status: "locked", server_time: "2026-08-17T18:00:00Z", opens_at: null, closes_at: null, seconds_until_open: 3600, seconds_until_close: null },
+      admin: { verification_label: "Verified", stream_summary: { channels: 0, sources: 0, enabled_sources: 0, healthy_sources: 0 }, warnings: [] },
+    };
+    const fetchMock = mockLoginFlow(jsonResponse({ data: { user: { email: "owner@example.com" } } }));
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/auth/user")) return jsonResponse({ data: { id: 1, email: "owner@example.com", active: true, is_admin: true, roles: [] } });
+      if (url.includes("/admin/matches")) return jsonResponse({ data: [match], admin_meta: { timezone: "Africa/Casablanca", counters: { today: 1, live: 0, upcoming: 1, finished: 0, needs_channel: 1, needs_verification: 0, featured: 0 }, counter_labels: {}, attention: [] }, meta: { current_page: 1, last_page: 1, total: 1, per_page: 50 } });
+      if (init?.method === "DELETE") return jsonResponse({ data: { message: "Match archived" } });
+      return jsonResponse(emptyList);
+    });
+
+    render(<AdminClient />);
+    expect(await screen.findByRole("heading", { level: 1, name: "Matches" })).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "More match actions" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+
+    expect(screen.getByRole("heading", { name: "Delete match?" })).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining("/admin/matches/7"), expect.objectContaining({ method: "DELETE" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Match" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/admin/matches/7"), expect.objectContaining({ method: "DELETE", body: JSON.stringify({ confirm_delete: true }) })));
+    expect(await screen.findByText("Match deleted.")).toBeInTheDocument();
+  });
+
+  it("keeps delete validation inside the confirmation modal", async () => {
+    pathnameState.value = "/admin/matches";
+    const match = {
+      id: 8,
+      slug: "delete-validation-match",
+      home_team: { id: 1, name: "Home" },
+      away_team: { id: 2, name: "Away" },
+      competition: { id: 1, name: "League" },
+      status: "scheduled",
+      status_label: "Scheduled",
+      home_score: null,
+      away_score: null,
+      minute: null,
+      featured: false,
+      published_at: null,
+      kickoff_at: "2026-08-17T19:00:00Z",
+      scheduled_date: "2026-08-17",
+      verification_status: "manual_verified",
+      channels: [],
+      playback_window: { status: "locked", server_time: "2026-08-17T18:00:00Z", opens_at: null, closes_at: null, seconds_until_open: 3600, seconds_until_close: null },
+      admin: { verification_label: "Verified", stream_summary: { channels: 0, sources: 0, enabled_sources: 0, healthy_sources: 0 }, warnings: [] },
+    };
+    const fetchMock = mockLoginFlow(jsonResponse({ data: { user: { email: "owner@example.com" } } }));
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/auth/user")) return jsonResponse({ data: { id: 1, email: "owner@example.com", active: true, is_admin: true, roles: [] } });
+      if (url.includes("/admin/matches")) {
+        if (init?.method === "DELETE") return jsonResponse({ message: "The given data was invalid.", errors: { confirm_delete: ["The confirm delete field must be accepted."] } }, 422);
+        return jsonResponse({ data: [match], admin_meta: { timezone: "Africa/Casablanca", counters: { today: 1, live: 0, upcoming: 1, finished: 0, needs_channel: 1, needs_verification: 0, featured: 0 }, counter_labels: {}, attention: [] }, meta: { current_page: 1, last_page: 1, total: 1, per_page: 50 } });
+      }
+      return jsonResponse(emptyList);
+    });
+
+    render(<AdminClient />);
+    await screen.findByRole("heading", { level: 1, name: "Matches" });
+    fireEvent.click(await screen.findByRole("button", { name: "More match actions" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete Match" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("The confirm delete field must be accepted.");
+    expect(screen.getByRole("heading", { name: "Delete match?" })).toBeInTheDocument();
+    expect(screen.queryByText("Something went wrong.")).not.toBeInTheDocument();
   });
 });

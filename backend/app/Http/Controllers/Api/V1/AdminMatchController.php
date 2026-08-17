@@ -42,9 +42,21 @@ class AdminMatchController extends Controller
 
     public function destroy(Request $request, GameMatch $match, MatchService $service)
     {
+        $request->validate(['confirm_delete' => ['accepted']]);
         $service->archive($match, $request->user());
 
         return response()->json(['data' => ['message' => 'Match archived']]);
+    }
+
+    public function publication(Request $request, GameMatch $match, MatchService $service)
+    {
+        abort_unless($request->user()?->hasPermission('matches.manage'), 403);
+        $validated = $request->validate([
+            'published' => ['required', 'boolean'],
+            'visibility' => ['sometimes', Rule::in(['public', 'internal', 'manual_only'])],
+        ]);
+
+        return new MatchResource($service->setPublication($match, $validated['published'], $validated['visibility'] ?? null, $request->user()));
     }
 
     public function duplicate(Request $request, GameMatch $match, MatchService $service)
@@ -68,7 +80,7 @@ class AdminMatchController extends Controller
             'action' => ['required', 'in:publish,unpublish,feature,unfeature,verify,assign_competition,set_status,delete'],
             'competition_id' => ['required_if:action,assign_competition', 'integer', 'exists:competitions,id'],
             'status' => ['required_if:action,set_status', Rule::in(['scheduled', 'live', 'halftime', 'finished', 'postponed', 'cancelled'])],
-            'confirm_delete' => ['required_if:action,delete', 'accepted'],
+            'confirm_delete' => ['sometimes', 'required_if:action,delete', 'accepted'],
         ]);
 
         return response()->json(['data' => ['updated' => $service->bulk($validated['ids'], $validated['action'], $request->user(), $validated)]]);
