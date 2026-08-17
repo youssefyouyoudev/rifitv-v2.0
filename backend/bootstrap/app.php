@@ -21,9 +21,17 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
+
+        // Public analytics endpoint: do not require CSRF.
+        // Keep this exemption limited to this exact endpoint.
+        $middleware->validateCsrfTokens(except: [
+            'api/v1/analytics/events',
+        ]);
+
         $middleware->api(prepend: [
             AddSecurityHeaders::class,
         ]);
+
         $middleware->alias([
             'admin' => EnsureAdmin::class,
             'permission' => EnsurePermission::class,
@@ -43,17 +51,24 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             if ($e instanceof AuthenticationException) {
-                return response()->json(['message' => 'Authentication is required.'], 401);
+                return response()->json([
+                    'message' => 'Authentication is required.',
+                ], 401);
             }
 
             if ($e instanceof AuthorizationException) {
-                return response()->json(['message' => 'This action is not allowed.'], 403);
+                return response()->json([
+                    'message' => 'This action is not allowed.',
+                ], 403);
             }
 
             if ($e instanceof ModelNotFoundException) {
-                return response()->json(['message' => 'The requested resource was not found.'], 404);
+                return response()->json([
+                    'message' => 'The requested resource was not found.',
+                ], 404);
             }
 
             return null;
         });
-    })->create();
+    })
+    ->create();
