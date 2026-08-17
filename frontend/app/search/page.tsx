@@ -12,6 +12,7 @@ export const metadata: Metadata = {
   title: "Search",
   description: "Search RiFiTV teams, matches and competitions.",
   alternates: { canonical: absoluteUrl("/search") },
+  robots: { index: false, follow: true },
 };
 
 export default async function SearchPage({ searchParams }: PageProps<"/search">) {

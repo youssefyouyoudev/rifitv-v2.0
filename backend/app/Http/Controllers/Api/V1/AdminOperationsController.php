@@ -18,27 +18,28 @@ use App\Models\OperationalAlert;
 use App\Models\StreamHealthCheck;
 use App\Models\StreamSource;
 use App\Models\SyncRun;
+use App\Services\MatchDateWindowService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class AdminOperationsController extends Controller
 {
-    public function today(Request $request)
+    public function today(Request $request, MatchDateWindowService $dateWindow)
     {
         abort_unless($request->user()?->hasPermission('alerts.view') || $request->user()?->hasPermission('matches.manage'), 403);
-        $start = now()->startOfDay();
-        $end = now()->endOfDay();
+        $now = now();
+        $today = $dateWindow->today();
         $matches = GameMatch::query()
             ->publicGraph()
-            ->where(fn ($query) => $query->whereBetween('kickoff_at', [$start, $end])->orWhereDate('scheduled_date', now()->toDateString()))
+            ->onLocalDate($today)
             ->orderByRaw('COALESCE(kickoff_at, scheduled_date)')
             ->get();
 
         return response()->json(['data' => [
             'live' => MatchResource::collection($matches->filter(fn (GameMatch $match): bool => in_array($match->status->value, ['live', 'halftime'], true))->values()),
-            'starting_soon' => MatchResource::collection($matches->filter(fn (GameMatch $match): bool => $match->status->value === 'scheduled' && $match->kickoff_at !== null && $match->kickoff_at <= now()->addHours(2))->values()),
-            'later_today' => MatchResource::collection($matches->filter(fn (GameMatch $match): bool => $match->status->value === 'scheduled' && ($match->kickoff_at === null || $match->kickoff_at > now()->addHours(2)))->values()),
+            'starting_soon' => MatchResource::collection($matches->filter(fn (GameMatch $match): bool => $match->status->value === 'scheduled' && $match->kickoff_at !== null && $match->kickoff_at->between($now, $now->copy()->addHours(2)))->values()),
+            'later_today' => MatchResource::collection($matches->filter(fn (GameMatch $match): bool => $match->status->value === 'scheduled' && ($match->kickoff_at === null || $match->kickoff_at->gt($now->copy()->addHours(2))))->values()),
             'finished' => MatchResource::collection($matches->filter(fn (GameMatch $match): bool => $match->status->value === 'finished')->values()),
             'readiness' => $matches->mapWithKeys(fn (GameMatch $match): array => [$match->id => $this->readiness($match)]),
         ]]);

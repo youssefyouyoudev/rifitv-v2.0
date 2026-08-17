@@ -100,7 +100,12 @@ async function apiGet<T>(path: string): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(`RiFiTV API request failed: ${response.status}`);
+    const payload = await response.json().catch(() => undefined);
+    const message = typeof payload === "object" && payload && "message" in payload
+      ? String(payload.message)
+      : `RiFiTV API request failed: ${response.status}`;
+
+    throw new ApiError(message, response.status, payload);
   }
 
   return (await response.json()) as T;
@@ -110,7 +115,7 @@ export async function getHome(): Promise<HomePayload> {
   return (await apiGet<ApiEnvelope<HomePayload>>("/home")).data;
 }
 
-export async function getMatches(status?: string, competition?: string, date?: string, search?: string): Promise<Match[]> {
+export async function getMatches(status?: string, competition?: string, date?: string, search?: string, territory?: string): Promise<Match[]> {
   const params = new URLSearchParams();
   if (status) {
     params.set("status", status);
@@ -123,6 +128,9 @@ export async function getMatches(status?: string, competition?: string, date?: s
   }
   if (search) {
     params.set("search", search);
+  }
+  if (territory) {
+    params.set("territory", territory);
   }
   params.set("per_page", "50");
   const query = params.toString() ? `?${params.toString()}` : "";

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\MatchResource;
+use App\Models\GameMatch;
 use App\Services\MatchScheduleService;
 use Illuminate\Http\Request;
 

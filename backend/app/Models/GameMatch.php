@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\MatchStatus;
 use App\Enums\MatchVisibility;
+use App\Services\MatchDateWindowService;
 use Database\Factories\GameMatchFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,7 +12,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Carbon;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class GameMatch extends Model
@@ -130,20 +130,27 @@ class GameMatch extends Model
         return $query
             ->whereNotNull('published_at')
             ->where('visibility', MatchVisibility::Public)
-            ->whereIn('verification_status', ['verified', 'manual_verified']);
+            ->where(function (Builder $publicationQuery): void {
+                $publicationQuery
+                    ->whereIn('verification_status', ['verified', 'manual_verified'])
+                    ->orWhere(function (Builder $manualQuery): void {
+                        $manualQuery
+                            ->whereIn('source_provider', ['manual', 'manual-admin', 'manual-copy'])
+                            ->where('verification_status', 'pending_verification');
+                    });
+            });
     }
 
     public function scopeOnLocalDate(Builder $query, string $date, ?string $timezone = null): Builder
     {
-        $timezone ??= (string) config('rifitv.display_timezone', 'Africa/Casablanca');
-        $localDay = Carbon::parse($date, $timezone);
-        $startUtc = $localDay->copy()->startOfDay()->utc();
-        $endUtc = $localDay->copy()->endOfDay()->utc();
+        $window = app(MatchDateWindowService::class)->bounds($date);
 
-        return $query->where(function (Builder $dateQuery) use ($date, $startUtc, $endUtc): void {
+        return $query->where(function (Builder $dateQuery) use ($date, $window): void {
             $dateQuery
-                ->whereBetween('kickoff_at', [$startUtc, $endUtc])
-                ->orWhereDate('scheduled_date', $date);
+                ->whereBetween('kickoff_at', [$window['start'], $window['end']])
+                ->orWhere(function (Builder $dateOnlyQuery) use ($date): void {
+                    $dateOnlyQuery->whereNull('kickoff_at')->whereDate('scheduled_date', $date);
+                });
         });
     }
 

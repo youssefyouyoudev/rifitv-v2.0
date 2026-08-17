@@ -51,6 +51,15 @@ export default async function MatchPage({ params }: PageProps<"/match/[slug]">) 
   return (
     <AppShell>
       <JsonLd id={`sports-event-${match.id}`} data={sportsEventJsonLd} />
+      <JsonLd id={`match-breadcrumb-${match.id}`} data={{
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
+          { "@type": "ListItem", position: 2, name: "Football", item: absoluteUrl("/football") },
+          { "@type": "ListItem", position: 3, name: `${match.home_team.name} vs ${match.away_team.name}`, item: absoluteUrl(`/match/${match.slug}`) },
+        ],
+      }} />
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
         <section className="space-y-4">
           {canPlay ? (

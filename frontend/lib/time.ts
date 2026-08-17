@@ -1,3 +1,5 @@
+import { addDays, localDateKey } from "./footballDate";
+
 const displayLocale = "en-GB";
 const displayTimeZone = "Africa/Casablanca";
 
@@ -100,23 +102,4 @@ const shortDateFormatter = new Intl.DateTimeFormat(displayLocale, {
   timeZone: displayTimeZone,
 });
 
-function dateKey(date: Date): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    timeZone: displayTimeZone,
-  }).formatToParts(date);
-  const year = parts.find((part) => part.type === "year")?.value;
-  const month = parts.find((part) => part.type === "month")?.value;
-  const day = parts.find((part) => part.type === "day")?.value;
-
-  return `${year}-${month}-${day}`;
-}
-
-function addDays(date: string, days: number): string {
-  const next = new Date(`${date}T12:00:00Z`);
-  next.setUTCDate(next.getUTCDate() + days);
-
-  return next.toISOString().slice(0, 10);
-}
+function dateKey(date: Date): string { return localDateKey(date); }

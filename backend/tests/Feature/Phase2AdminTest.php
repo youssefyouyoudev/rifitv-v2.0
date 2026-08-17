@@ -52,6 +52,7 @@ it('creates publishes duplicates archives and audits a match', function (): void
     ])->assertOk()->json('data.id');
 
     $this->assertDatabaseHas('matches', ['id' => $matchId, 'featured' => true]);
+    $this->getJson('/api/v1/matches?per_page=50')->assertJsonFragment(['id' => $matchId]);
     expect(AuditLog::query()->where('action', 'match.created')->exists())->toBeTrue();
 
     $this->postJson("/api/v1/admin/matches/{$matchId}/duplicate")->assertOk()->assertJsonPath('data.status', 'scheduled');

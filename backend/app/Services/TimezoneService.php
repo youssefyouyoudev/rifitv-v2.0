@@ -14,6 +14,6 @@ class TimezoneService
             return $value;
         }
 
-        return config('app.display_timezone', 'UTC');
+        return (string) config('rifitv.display_timezone', 'Africa/Casablanca');
     }
 }

@@ -91,18 +91,35 @@ class MatchService
     {
         $homeName = $data['home_team_name'] ?? $existing?->homeTeam?->name ?? 'home';
         $awayName = $data['away_team_name'] ?? $existing?->awayTeam?->name ?? 'away';
+        $timezone = (string) config('rifitv.display_timezone', 'Africa/Casablanca');
+        $kickoff = isset($data['kickoff_at']) ? Carbon::parse($data['kickoff_at'], $timezone) : $existing?->kickoff_at;
+        $published = (bool) ($data['published'] ?? (bool) $existing?->published_at);
+        $sourceProvider = $existing?->source_provider ?? 'manual-admin';
+        $isManual = in_array($sourceProvider, ['manual', 'manual-admin', 'manual-copy'], true);
+        $verificationStatus = $existing?->verification_status ?? 'pending_verification';
+        $sourceVerifiedAt = $existing?->source_verified_at;
+
+        if ($isManual && $published) {
+            $verificationStatus = 'manual_verified';
+            $sourceVerifiedAt ??= now();
+        }
 
         return [
             'competition_id' => $data['competition_id'] ?? $existing?->competition_id,
             'home_team_id' => $data['home_team_id'] ?? $existing?->home_team_id,
             'away_team_id' => $data['away_team_id'] ?? $existing?->away_team_id,
-            'kickoff_at' => isset($data['kickoff_at']) ? Carbon::parse($data['kickoff_at'])->utc() : $existing?->kickoff_at,
+            'kickoff_at' => $kickoff?->utc(),
+            'scheduled_date' => $kickoff?->toDateString() ?? $existing?->scheduled_date,
+            'source_provider' => $sourceProvider,
+            'source_external_id' => $existing?->source_external_id,
+            'source_verified_at' => $sourceVerifiedAt,
+            'verification_status' => $verificationStatus,
             'status' => $data['status'] ?? $existing?->status ?? MatchStatus::Scheduled,
             'home_score' => $data['home_score'] ?? $existing?->home_score,
             'away_score' => $data['away_score'] ?? $existing?->away_score,
             'minute' => $data['minute'] ?? $existing?->minute,
             'featured' => $data['featured'] ?? $existing?->featured ?? false,
-            'published_at' => ($data['published'] ?? (bool) $existing?->published_at) ? ($existing?->published_at ?? now()) : null,
+            'published_at' => $published ? ($existing?->published_at ?? now()) : null,
             'visibility' => $data['visibility'] ?? $existing?->visibility ?? MatchVisibility::Public,
             'seo_title' => $data['seo_title'] ?? $existing?->seo_title,
             'seo_description' => $data['seo_description'] ?? $existing?->seo_description,

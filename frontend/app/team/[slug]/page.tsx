@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AppShell } from "@/components/AppShell";
 import { MatchSection } from "@/components/MatchSection";
+import { JsonLd } from "@/components/JsonLd";
 import { TeamMark } from "@/components/TeamMark";
 import { getTeam } from "@/lib/api";
 import { absoluteUrl, SITE_NAME } from "@/lib/site";
@@ -29,6 +30,15 @@ export default async function TeamPage({ params }: PageProps<"/team/[slug]">) {
 
   return (
     <AppShell>
+      <JsonLd id={`team-breadcrumb-${payload.team.id}`} data={{
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
+          { "@type": "ListItem", position: 2, name: payload.team.name, item: absoluteUrl(`/team/${payload.team.slug}`) },
+        ],
+      }} />
+      <JsonLd id={`team-${payload.team.id}`} data={{ "@context": "https://schema.org", "@type": "SportsTeam", name: payload.team.name, url: absoluteUrl(`/team/${payload.team.slug}`) }} />
       <div className="space-y-6">
         <section className="flex items-center gap-4 rounded-lg border border-white/10 bg-neutral-900 p-5">
           <TeamMark team={payload.team} size="lg" />

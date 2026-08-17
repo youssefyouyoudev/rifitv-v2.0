@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Cache;
 
 class PublicContentService
 {
+    public function __construct(private readonly MatchDateWindowService $dateWindow) {}
+
     public function homePayload(): array
     {
         $timezone = (string) config('rifitv.display_timezone', 'Africa/Casablanca');
@@ -35,16 +37,12 @@ class PublicContentService
     private function buildHomePayload(string $timezone, Carbon $localNow): array
     {
         $now = Carbon::now('UTC');
-        $localDate = $localNow->toDateString();
-        $startUtc = $localNow->copy()->startOfDay()->utc();
-        $endUtc = $localNow->copy()->endOfDay()->utc();
+        $localDate = $this->dateWindow->dateForInstant($localNow);
+        $window = $this->dateWindow->bounds($localDate);
 
         $base = GameMatch::query()->published()->publicGraph();
-        $todayQuery = fn ($query) => $query
-            ->whereBetween('kickoff_at', [$startUtc, $endUtc])
-            ->orWhereDate('scheduled_date', $localDate);
         $today = (clone $base)
-            ->where($todayQuery)
+            ->onLocalDate($localDate)
             ->scheduleOrder()
             ->limit(24)
             ->get();
@@ -59,7 +57,7 @@ class PublicContentService
             'today_count' => $today->count(),
             'next_match' => (clone $base)
                 ->where(fn ($query) => $query
-                    ->where('kickoff_at', '>', $endUtc)
+                    ->where('kickoff_at', '>', $window['end'])
                     ->orWhereDate('scheduled_date', '>', $localDate))
                 ->where('status', MatchStatus::Scheduled)
                 ->scheduleOrder()

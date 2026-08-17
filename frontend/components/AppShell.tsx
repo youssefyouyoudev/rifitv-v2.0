@@ -7,7 +7,8 @@ import { ThemeToggle } from "./ThemeToggle";
 const nav = [
   { href: "/", label: "Home", icon: Home },
   { href: "/live", label: "Live", icon: Radio },
-  { href: "/matches", label: "Matches", icon: CalendarDays },
+  { href: "/football/today", label: "Today", icon: CalendarDays },
+  { href: "/matches", label: "Matches", icon: List },
   { href: "/competitions", label: "Competitions", icon: Trophy },
 ];
 

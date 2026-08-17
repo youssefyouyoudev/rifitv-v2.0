@@ -29,10 +29,11 @@ import {
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { RiFiTVLogo } from "@/components/RiFiTVLogo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { apiFetch, ApiError, csrfCookie } from "@/lib/api";
+import { addDays, adminDateFormatter, adminTimeFormatter, localDateKey, localDateTimeInput, localTodayDate } from "@/lib/footballDate";
 
 type ApiList<T> = { data: T[]; admin_meta?: AdminMatchMeta; meta?: { current_page?: number; last_page?: number; total?: number; per_page?: number } };
 type ApiOne<T> = { data: T };
@@ -220,6 +221,10 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
           setAuthStatus("guest");
           return;
         }
+        if (caught instanceof ApiError && caught.status === 403) {
+          setAuthStatus("forbidden");
+          return;
+        }
         setError(caught instanceof Error ? caught.message : "Unable to verify the admin session.");
         setAuthStatus("guest");
       }
@@ -241,7 +246,7 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
 
     let mounted = true;
 
-    loadAll().catch((caught) => {
+    loadActive().catch((caught) => {
       if (!mounted) return;
       handleApiFailure(caught);
     });
@@ -249,9 +254,9 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
     return () => {
       mounted = false;
     };
-    // loadAll intentionally uses current session state.
+    // loadActive intentionally uses current session state and active route.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authStatus]);
+  }, [authStatus, active]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -280,6 +285,7 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
       } catch (caught) {
         if (!(caught instanceof DOMException && caught.name === "AbortError")) {
           setSearchResults([]);
+          handleApiFailure(caught);
         }
       }
     }, 400);
@@ -293,7 +299,7 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
     if (authStatus !== "authenticated" || active !== "match-control" || !selectedControlMatchId) {
       return;
     }
-    void loadControl(selectedControlMatchId);
+    void loadControl(selectedControlMatchId).catch(handleApiFailure);
     // loadControl intentionally uses current session state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, selectedControlMatchId, authStatus]);
@@ -316,91 +322,169 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
     router.replace("/admin");
   }
 
-  async function adminGet<T>(path: string, signal?: AbortSignal): Promise<T> {
-    return apiFetch<T>(path, { signal });
-  }
+  const syncAuthFromError = useCallback((caught: unknown) => {
+    if (caught instanceof ApiError && caught.status === 401) {
+      setAuthStatus("guest");
+    }
+    if (caught instanceof ApiError && caught.status === 403) {
+      setAuthStatus("forbidden");
+    }
+  }, []);
 
-  async function adminSend<T>(path: string, method: string, body?: unknown): Promise<T> {
+  const adminGet = useCallback(async <T,>(path: string, signal?: AbortSignal): Promise<T> => {
     try {
-      return await apiFetch<T>(path, {
-        method,
-        body: body ? JSON.stringify(body) : undefined,
-      });
+      return await apiFetch<T>(path, { signal });
     } catch (caught) {
-      if (caught instanceof ApiError && caught.status === 419) {
-        await csrfCookie();
+      syncAuthFromError(caught);
+      throw caught;
+    }
+  }, [syncAuthFromError]);
+
+  const adminSend = useCallback(async <T,>(path: string, method: string, body?: unknown): Promise<T> => {
+    let csrfRetried = false;
+
+    while (true) {
+      try {
         return await apiFetch<T>(path, {
           method,
           body: body ? JSON.stringify(body) : undefined,
         });
+      } catch (caught) {
+        if (caught instanceof ApiError && caught.status === 419 && !csrfRetried) {
+          csrfRetried = true;
+          await csrfCookie();
+          continue;
+        }
+        syncAuthFromError(caught);
+        throw caught;
       }
-      if (caught instanceof ApiError && caught.status === 401) {
-        setAuthStatus("guest");
-      }
-      if (caught instanceof ApiError && caught.status === 403) {
-        setAuthStatus("forbidden");
-      }
-      throw caught;
     }
-  }
+  }, [syncAuthFromError]);
 
-  async function adminUpload<T>(path: string, body: FormData): Promise<T> {
-    try {
-      return await apiFetch<T>(path, {
-        method: "POST",
-        body,
-      });
-    } catch (caught) {
-      if (caught instanceof ApiError && caught.status === 419) {
-        await csrfCookie();
-        return await apiFetch<T>(path, {
-          method: "POST",
-          body,
-        });
+  const adminUpload = useCallback(async <T,>(path: string, body: FormData): Promise<T> => {
+    let csrfRetried = false;
+
+    while (true) {
+      try {
+        return await apiFetch<T>(path, { method: "POST", body });
+      } catch (caught) {
+        if (caught instanceof ApiError && caught.status === 419 && !csrfRetried) {
+          csrfRetried = true;
+          await csrfCookie();
+          continue;
+        }
+        syncAuthFromError(caught);
+        throw caught;
       }
-      if (caught instanceof ApiError && caught.status === 401) {
-        setAuthStatus("guest");
-      }
-      if (caught instanceof ApiError && caught.status === 403) {
-        setAuthStatus("forbidden");
-      }
-      throw caught;
     }
-  }
+  }, [syncAuthFromError]);
 
-  async function loadAll() {
-    const [dash, matchList, teamList, competitionList, channelList, sourceList, playlistList, auditList, todayOps, healthList, alertList, runList, importList, queue, appHealth] = await Promise.all([
-      adminGet<ApiOne<Dashboard>>("/admin/dashboard"),
-      adminGet<ApiList<Match>>("/admin/matches?per_page=30"),
-      adminGet<ApiList<Entity>>("/admin/teams?per_page=100"),
-      adminGet<ApiList<Entity>>("/admin/competitions?per_page=100"),
-      adminGet<ApiList<Entity>>("/admin/channels?per_page=100"),
-      adminGet<ApiList<Entity>>("/admin/stream-sources?per_page=100"),
-      adminGet<ApiList<Playlist>>("/admin/playlists?per_page=100"),
-      adminGet<ApiList<Entity>>("/admin/audit-logs?per_page=30"),
-      adminGet<ApiOne<TodayOps>>("/admin/today"),
-      adminGet<ApiList<Entity>>("/admin/stream-health?per_page=100"),
-      adminGet<ApiList<Alert>>("/admin/alerts"),
-      adminGet<ApiList<SyncRun>>("/admin/sync-runs"),
-      adminGet<ApiList<FixtureImport>>("/admin/imports/fixtures"),
-      adminGet<ApiOne<QueueHealth>>("/admin/queue-health"),
-      adminGet<ApiOne<DetailedHealth>>("/admin/health"),
-    ]);
-    setDashboard(dash.data);
-    setMatches(matchList.data);
-    setTeams(teamList.data);
-    setCompetitions(competitionList.data);
-    setChannels(channelList.data);
-    setSources(sourceList.data);
-    setPlaylists(playlistList.data);
-    setAudit(auditList.data);
-    setToday(todayOps.data);
-    setStreamHealth(healthList.data);
-    setAlerts(alertList.data);
-    setSyncRuns(runList.data);
-    setFixtureImports(importList.data);
-    setQueueHealth(queue.data);
-    setDetailedHealth(appHealth.data);
+  async function loadActive() {
+    switch (active) {
+      case "dashboard": {
+        setDashboard((await adminGet<ApiOne<Dashboard>>("/admin/dashboard")).data);
+        return;
+      }
+      case "today":
+      case "upcoming": {
+        setToday((await adminGet<ApiOne<TodayOps>>("/admin/today")).data);
+        return;
+      }
+      case "matches": {
+        const [matchList, teamList, competitionList, channelList] = await Promise.all([
+          adminGet<ApiList<Match>>("/admin/matches?per_page=50"),
+          adminGet<ApiList<Entity>>("/admin/teams?per_page=100"),
+          adminGet<ApiList<Entity>>("/admin/competitions?per_page=100"),
+          adminGet<ApiList<Entity>>("/admin/channels?per_page=100"),
+        ]);
+        setMatches(matchList.data);
+        setTeams(teamList.data);
+        setCompetitions(competitionList.data);
+        setChannels(channelList.data);
+        return;
+      }
+      case "match-control":
+      case "live": {
+        const [matchList, channelList] = await Promise.all([
+          adminGet<ApiList<Match>>("/admin/matches?per_page=50"),
+          adminGet<ApiList<Entity>>("/admin/channels?per_page=100"),
+        ]);
+        setMatches(matchList.data);
+        setChannels(channelList.data);
+        return;
+      }
+      case "teams": {
+        setTeams((await adminGet<ApiList<Entity>>("/admin/teams?per_page=100")).data);
+        return;
+      }
+      case "competitions": {
+        const [competitionList, teamList] = await Promise.all([
+          adminGet<ApiList<Entity>>("/admin/competitions?per_page=100"),
+          adminGet<ApiList<Entity>>("/admin/teams?per_page=100"),
+        ]);
+        setCompetitions(competitionList.data);
+        setTeams(teamList.data);
+        return;
+      }
+      case "channels": {
+        setChannels((await adminGet<ApiList<Entity>>("/admin/channels?per_page=100")).data);
+        return;
+      }
+      case "playlists": {
+        setPlaylists((await adminGet<ApiList<Playlist>>("/admin/playlists?per_page=100")).data);
+        return;
+      }
+      case "sources": {
+        const [sourceList, channelList] = await Promise.all([
+          adminGet<ApiList<Entity>>("/admin/stream-sources?per_page=100"),
+          adminGet<ApiList<Entity>>("/admin/channels?per_page=100"),
+        ]);
+        setSources(sourceList.data);
+        setChannels(channelList.data);
+        return;
+      }
+      case "stream-health": {
+        setStreamHealth((await adminGet<ApiList<Entity>>("/admin/stream-health?per_page=100")).data);
+        return;
+      }
+      case "imports": {
+        const [importList, runList] = await Promise.all([
+          adminGet<ApiList<FixtureImport>>("/admin/imports/fixtures"),
+          adminGet<ApiList<SyncRun>>("/admin/sync-runs"),
+        ]);
+        setFixtureImports(importList.data);
+        setSyncRuns(runList.data);
+        return;
+      }
+      case "operations": {
+        const [alertList, runList, queue, appHealth] = await Promise.all([
+          adminGet<ApiList<Alert>>("/admin/alerts"),
+          adminGet<ApiList<SyncRun>>("/admin/sync-runs"),
+          adminGet<ApiOne<QueueHealth>>("/admin/queue-health"),
+          adminGet<ApiOne<DetailedHealth>>("/admin/health"),
+        ]);
+        setAlerts(alertList.data);
+        setSyncRuns(runList.data);
+        setQueueHealth(queue.data);
+        setDetailedHealth(appHealth.data);
+        return;
+      }
+      case "homepage": {
+        const [matchList, competitionList] = await Promise.all([
+          adminGet<ApiList<Match>>("/admin/matches?per_page=50"),
+          adminGet<ApiList<Entity>>("/admin/competitions?per_page=100"),
+        ]);
+        setMatches(matchList.data);
+        setCompetitions(competitionList.data);
+        return;
+      }
+      case "audit": {
+        setAudit((await adminGet<ApiList<Entity>>("/admin/audit-logs?per_page=50")).data);
+        return;
+      }
+      default:
+        return;
+    }
   }
 
   async function loadControl(matchId: number) {
@@ -412,12 +496,7 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
     const message = apiErrorMessage(caught);
 
     setError(message);
-    if (caught instanceof ApiError && caught.status === 401) {
-      setAuthStatus("guest");
-    }
-    if (caught instanceof ApiError && caught.status === 403) {
-      setAuthStatus("forbidden");
-    }
+    syncAuthFromError(caught);
   }
 
   async function run(action: () => Promise<void>, success: string) {
@@ -425,7 +504,7 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
       setError(null);
       await action();
       setNotice(success);
-      await loadAll();
+      await loadActive();
     } catch (caught) {
       handleApiFailure(caught);
     }
@@ -526,7 +605,7 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
               <p className="text-sm text-[var(--muted)]">Daily football operation: add game, assign broadcast, publish, update score.</p>
             </div>
             <div className="flex gap-2">
-              <button className="h-10 rounded-md border border-[var(--border)] px-3 text-sm text-[var(--foreground)]" onClick={() => void loadAll()}><RotateCcw className="mr-2 inline h-4 w-4" />Refresh</button>
+              <button className="h-10 rounded-md border border-[var(--border)] px-3 text-sm text-[var(--foreground)]" onClick={() => void loadActive().catch(handleApiFailure)}><RotateCcw className="mr-2 inline h-4 w-4" />Refresh</button>
               <button className="h-10 rounded-md border border-[var(--border)] px-3 text-sm text-[var(--foreground)]" onClick={() => void logout()}>Logout</button>
             </div>
           </div>
@@ -798,7 +877,6 @@ function MatchManager({ matches, teams, competitions, channels, run, adminGet, a
   }
 
   async function refreshMatches() {
-    if (!adminGet) return;
     const payload = await adminGet<ApiList<Match>>(`/admin/matches?${matchQuery(filters).toString()}`);
     setItems(payload.data);
     setMeta(payload.admin_meta ?? null);
@@ -840,7 +918,7 @@ function MatchManager({ matches, teams, competitions, channels, run, adminGet, a
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
         {[
           ["Today", meta?.counters.today ?? 0, { date: localTodayDate() }],
-          ["Live", meta?.counters.live ?? 0, { status: "active" }],
+          ["Live", meta?.counters.live ?? 0, { status: "live" }],
           ["Upcoming", meta?.counters.upcoming ?? 0, { status: "scheduled" }],
           ["Finished", meta?.counters.finished ?? 0, { status: "finished" }],
           ["Needs Channel", meta?.counters.needs_channel ?? 0, { channel: "missing" }],
@@ -1528,41 +1606,7 @@ function Empty({ message }: { message: string }) { return <p className="rounded-
 function Toast({ tone, message, onClose }: { tone: "success" | "error"; message: string; onClose: () => void }) { return <div className={`mb-4 flex items-center justify-between rounded-md border p-3 text-sm ${tone === "success" ? "border-green-500/30 bg-green-500/10 text-green-200" : "border-red-500/30 bg-red-500/10 text-red-200"}`}><span>{tone === "success" ? <Check className="mr-2 inline h-4 w-4" /> : null}{message}</span><button onClick={onClose}><X className="h-4 w-4" /></button></div>; }
 function groupBy<T extends Record<string, unknown>>(items: T[], key: keyof T): Record<string, T[]> { return items.reduce((groups, item) => { const value = String(item[key]); groups[value] ??= []; groups[value].push(item); return groups; }, {} as Record<string, T[]>); }
 function labelize(value: string): string { return value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()); }
-const adminDisplayTimezone = "Africa/Casablanca";
-const adminDateFormatter = new Intl.DateTimeFormat("en-GB", {
-  weekday: "long",
-  day: "numeric",
-  month: "long",
-  timeZone: adminDisplayTimezone,
-});
-const adminTimeFormatter = new Intl.DateTimeFormat("en-GB", {
-  hour: "2-digit",
-  minute: "2-digit",
-  timeZone: adminDisplayTimezone,
-});
-function localTodayDate(): string { return localDateKey(new Date()); }
-function localDateKey(value: Date | string): string {
-  const date = typeof value === "string" ? new Date(value) : value;
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    timeZone: adminDisplayTimezone,
-  }).formatToParts(date);
-  const year = parts.find((part) => part.type === "year")?.value ?? "0000";
-  const month = parts.find((part) => part.type === "month")?.value ?? "01";
-  const day = parts.find((part) => part.type === "day")?.value ?? "01";
-
-  return `${year}-${month}-${day}`;
-}
-function addDays(date: string, amount: number): string {
-  const [year, month, day] = date.split("-").map(Number);
-  if (!year || !month || !day) return localTodayDate();
-  const next = new Date(Date.UTC(year, month - 1, day + amount, 12, 0, 0));
-
-  return next.toISOString().slice(0, 10);
-}
-function localDateTime(): string { const date = new Date(Date.now() + 60 * 60 * 1000); date.setMinutes(0, 0, 0); return date.toISOString().slice(0, 16); }
+function localDateTime(): string { return localDateTimeInput(); }
 function apiErrorMessage(caught: unknown): string {
   if (!(caught instanceof ApiError)) {
     return caught instanceof Error ? caught.message : "Something went wrong.";

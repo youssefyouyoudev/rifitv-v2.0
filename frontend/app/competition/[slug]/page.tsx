@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AppShell } from "@/components/AppShell";
 import { MatchCard } from "@/components/MatchCard";
+import { JsonLd } from "@/components/JsonLd";
 import { getCompetition } from "@/lib/api";
 import { groupMatchesByDate, sortMatches } from "@/lib/matches";
 import { absoluteUrl, SITE_NAME } from "@/lib/site";
@@ -32,6 +33,15 @@ export default async function CompetitionPage({ params }: PageProps<"/competitio
 
   return (
     <AppShell>
+      <JsonLd id={`competition-breadcrumb-${competition.id}`} data={{
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: absoluteUrl("/") },
+          { "@type": "ListItem", position: 2, name: "Competitions", item: absoluteUrl("/competitions") },
+          { "@type": "ListItem", position: 3, name: competition.name, item: absoluteUrl(`/competition/${competition.slug}`) },
+        ],
+      }} />
       <div className="space-y-8">
         <section className="border-b border-[var(--border)] pb-5">
           <h1 className="text-2xl font-bold text-[var(--foreground)]">{competition.name}</h1>

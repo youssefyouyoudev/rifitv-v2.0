@@ -23,7 +23,7 @@ const baseMatch: Match = {
   away_score: 1,
   minute: 42,
   featured: true,
-  channels: [],
+  channels: [{ id: 1, name: "RiFiTV Sports", slug: "rifitv-sports", logo_path: null, active: true, sort_order: 1 }],
   broadcasts: [],
   playback_window: {
     status: "open",

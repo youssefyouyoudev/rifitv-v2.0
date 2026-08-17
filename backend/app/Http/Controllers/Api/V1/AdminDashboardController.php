@@ -14,17 +14,15 @@ use App\Models\OperationalAlert;
 use App\Models\StreamSource;
 use App\Models\SyncRun;
 use App\Models\Team;
-use Carbon\CarbonImmutable;
+use App\Services\MatchDateWindowService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class AdminDashboardController extends Controller
 {
-    public function __invoke()
+    public function __invoke(MatchDateWindowService $dateWindow)
     {
-        $todayStart = CarbonImmutable::now('UTC')->startOfDay();
-        $todayEnd = CarbonImmutable::now('UTC')->endOfDay();
-        $today = GameMatch::query()->where(fn ($query) => $query->whereBetween('kickoff_at', [$todayStart, $todayEnd])->orWhereDate('scheduled_date', now()->toDateString()));
+        $today = GameMatch::query()->onLocalDate($dateWindow->today());
 
         return response()->json([
             'data' => [

@@ -2,6 +2,7 @@ import type { Match } from "@/lib/types";
 import { formatClockTime, formatMatchDateLabel, isLiveStatus } from "@/lib/time";
 import { CompetitionLogo } from "./CompetitionLogo";
 import { Countdown } from "./Countdown";
+import { StatusBadge } from "./StatusBadge";
 import { TeamMark } from "./TeamMark";
 import { TrackedLink } from "./TrackedLink";
 
@@ -9,7 +10,7 @@ export function MatchCard({ match, serverDate, featured = false }: { match: Matc
   const live = isLiveStatus(match.status);
   const finished = match.status === "finished";
   const playbackStatus = match.playback_window.status;
-  const watchable = playbackStatus === "open" || live;
+  const watchable = playbackStatus === "open" && match.channels.length > 0;
   const cta = live ? "Watch Live" : watchable ? "Watch" : "Details";
   const countdownSeconds = playbackStatus === "locked" || playbackStatus === "opening_soon"
     ? match.playback_window.seconds_until_open
@@ -27,6 +28,7 @@ export function MatchCard({ match, serverDate, featured = false }: { match: Matc
         <span className="shrink-0 text-sm font-semibold tabular-nums text-[var(--foreground)]">
           {live ? `${match.minute ?? "Live"}'` : formatClockTime(match.kickoff_at)}
         </span>
+        <StatusBadge status={match.status} />
       </div>
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
@@ -53,6 +55,7 @@ export function MatchCard({ match, serverDate, featured = false }: { match: Matc
             <span>{formatMatchDateLabel(match, serverDate)}</span>
           )}
           <span className="mt-0.5 block truncate text-xs">{formatMatchDateLabel(match, serverDate)}</span>
+          {match.channels.length > 0 ? <span className="mt-0.5 block truncate text-xs">TV: {match.channels.map((channel) => channel.name).join(", ")}</span> : null}
         </div>
         <TrackedLink
           href={`/match/${match.slug}`}

@@ -155,10 +155,14 @@ class FootballProductionAuditService
             ->all();
 
         $missingProvenance = $matches
-            ->filter(fn (GameMatch $match): bool => blank($match->source_provider)
-                || blank($match->source_external_id)
-                || blank($match->source_reference)
-                || blank($match->source_hash))
+            ->filter(function (GameMatch $match): bool {
+                $isManual = in_array($match->source_provider, ['manual', 'manual-admin', 'manual-copy'], true);
+
+                return ! $isManual && (blank($match->source_provider)
+                    || blank($match->source_external_id)
+                    || blank($match->source_reference)
+                    || blank($match->source_hash));
+            })
             ->map(fn (GameMatch $match): string => $this->fixtureLabel($match))
             ->values()
             ->all();

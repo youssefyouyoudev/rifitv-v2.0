@@ -132,3 +132,28 @@ it('returns competitions and competition details', function (): void {
         ->assertJsonPath('data.slug', 'premier-league')
         ->assertJsonStructure(['data' => ['matches']]);
 });
+
+it('keeps pending imported fixtures private while allowing explicitly published admin fixtures', function (): void {
+    $manual = GameMatch::factory()->create([
+        'slug' => 'manual-published-match',
+        'source_provider' => 'manual-admin',
+        'source_external_id' => null,
+        'source_verified_at' => null,
+        'verification_status' => 'pending_verification',
+        'published_at' => now(),
+        'visibility' => MatchVisibility::Public,
+    ]);
+    $imported = GameMatch::factory()->create([
+        'slug' => 'pending-imported-match',
+        'source_provider' => 'provider-feed',
+        'source_external_id' => 'provider-pending-1',
+        'verification_status' => 'pending_verification',
+        'published_at' => now(),
+        'visibility' => MatchVisibility::Public,
+    ]);
+
+    $this->getJson('/api/v1/matches?per_page=50')
+        ->assertOk()
+        ->assertJsonFragment(['slug' => $manual->slug])
+        ->assertJsonMissing(['slug' => $imported->slug]);
+});

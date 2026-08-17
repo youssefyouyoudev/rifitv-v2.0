@@ -8,19 +8,21 @@ import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "Football Matches & Fixtures",
-  description: "Browse RiFiTV football fixtures, upcoming matches, live match status and recent results for supported competitions.",
-  alternates: { canonical: absoluteUrl("/matches") },
-  openGraph: {
-    type: "website",
-    siteName: SITE_NAME,
-    title: "Football Matches & Fixtures",
-    description: "Browse supported football fixtures, live match status and recent results.",
-    url: absoluteUrl("/matches"),
-  },
-  twitter: { card: "summary_large_image", title: "Football Matches & Fixtures", description: "Browse supported football fixtures and live match status." },
-};
+export async function generateMetadata({ searchParams }: PageProps<"/matches">): Promise<Metadata> {
+  const params = await searchParams;
+  const filtered = Object.keys(params).length > 0;
+  const title = "Football Matches & Fixtures";
+  const description = "Browse RiFiTV football fixtures, upcoming matches, live match status and recent results for supported competitions.";
+
+  return {
+    title,
+    description,
+    alternates: { canonical: absoluteUrl("/matches") },
+    robots: filtered ? { index: false, follow: true } : undefined,
+    openGraph: { type: "website", siteName: SITE_NAME, title, description, url: absoluteUrl("/matches") },
+    twitter: { card: "summary", title, description },
+  };
+}
 
 const statusFilters = [
   { label: "All", value: undefined },
@@ -35,7 +37,8 @@ export default async function MatchesPage({ searchParams }: PageProps<"/matches"
   const competition = typeof params.competition === "string" ? params.competition : undefined;
   const date = typeof params.date === "string" ? params.date : undefined;
   const search = typeof params.search === "string" ? params.search : undefined;
-  const [matches, competitions] = await Promise.all([getMatches(status, competition, date, search), getCompetitions()]);
+  const territory = typeof params.territory === "string" ? params.territory : undefined;
+  const [matches, competitions] = await Promise.all([getMatches(status, competition, date, search, territory), getCompetitions()]);
   const groups = groupMatchesByDate(matches);
 
   return (
@@ -47,9 +50,15 @@ export default async function MatchesPage({ searchParams }: PageProps<"/matches"
             <p className="mt-1 text-sm text-[var(--muted)]">Full RiFiTV fixture schedule by date, kickoff time and competition</p>
           </div>
         </section>
-        <form className="grid gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 md:grid-cols-[180px_1fr_auto]">
+        <form className="grid gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 md:grid-cols-[180px_1fr_160px_auto]">
           <input type="date" name="date" defaultValue={date ?? ""} className="h-10 rounded-md border border-[var(--border)] bg-[var(--background)] px-3 text-sm text-[var(--foreground)]" />
           <input type="search" name="search" defaultValue={search ?? ""} placeholder="Search team, competition or slug" className="h-10 rounded-md border border-[var(--border)] bg-[var(--background)] px-3 text-sm text-[var(--foreground)]" />
+          <select name="territory" defaultValue={territory ?? ""} className="h-10 rounded-md border border-[var(--border)] bg-[var(--background)] px-3 text-sm text-[var(--foreground)]">
+            <option value="">All TV regions</option>
+            <option value="MENA">MENA</option>
+            <option value="EU">Europe</option>
+            <option value="US">United States</option>
+          </select>
           {status ? <input type="hidden" name="status" value={status} /> : null}
           {competition ? <input type="hidden" name="competition" value={competition} /> : null}
           <button className="h-10 rounded-md bg-[var(--brand-blue)] px-4 text-sm font-semibold text-white">Filter</button>
@@ -61,6 +70,7 @@ export default async function MatchesPage({ searchParams }: PageProps<"/matches"
             if (competition) nextParams.set("competition", competition);
             if (date) nextParams.set("date", date);
             if (search) nextParams.set("search", search);
+            if (territory) nextParams.set("territory", territory);
             const query = nextParams.toString();
             const href = `/matches${query ? `?${query}` : ""}`;
             const active = status === filter.value || (!status && !filter.value);
@@ -73,9 +83,9 @@ export default async function MatchesPage({ searchParams }: PageProps<"/matches"
           })}
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1">
-          <Link href={matchesHref({ status, date, search })} className={`inline-flex h-9 shrink-0 items-center rounded-md px-3 text-sm font-semibold ${!competition ? "bg-[var(--surface-muted)] text-[var(--foreground)]" : "border border-[var(--border)] text-[var(--muted)]"}`}>All competitions</Link>
+          <Link href={matchesHref({ status, date, search, territory })} className={`inline-flex h-9 shrink-0 items-center rounded-md px-3 text-sm font-semibold ${!competition ? "bg-[var(--surface-muted)] text-[var(--foreground)]" : "border border-[var(--border)] text-[var(--muted)]"}`}>All competitions</Link>
           {competitions.map((item) => (
-            <Link key={item.id} href={matchesHref({ status, date, search, competition: item.slug })} className={`inline-flex h-9 shrink-0 items-center rounded-md px-3 text-sm font-semibold ${competition === item.slug ? "bg-[var(--surface-muted)] text-[var(--foreground)]" : "border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-muted)]"}`}>
+            <Link key={item.id} href={matchesHref({ status, date, search, territory, competition: item.slug })} className={`inline-flex h-9 shrink-0 items-center rounded-md px-3 text-sm font-semibold ${competition === item.slug ? "bg-[var(--surface-muted)] text-[var(--foreground)]" : "border border-[var(--border)] text-[var(--muted)] hover:bg-[var(--surface-muted)]"}`}>
               {item.short_name ?? item.name}
             </Link>
           ))}
@@ -103,12 +113,13 @@ export default async function MatchesPage({ searchParams }: PageProps<"/matches"
   );
 }
 
-function matchesHref(values: { status?: string; competition?: string; date?: string; search?: string }): string {
+function matchesHref(values: { status?: string; competition?: string; date?: string; search?: string; territory?: string }): string {
   const params = new URLSearchParams();
   if (values.status) params.set("status", values.status);
   if (values.competition) params.set("competition", values.competition);
   if (values.date) params.set("date", values.date);
   if (values.search) params.set("search", values.search);
+  if (values.territory) params.set("territory", values.territory);
   const query = params.toString();
 
   return `/matches${query ? `?${query}` : ""}`;

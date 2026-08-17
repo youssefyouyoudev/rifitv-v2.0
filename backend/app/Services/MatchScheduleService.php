@@ -6,10 +6,11 @@ use App\Enums\MatchStatus;
 use App\Models\GameMatch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 
 class MatchScheduleService
 {
+    public function __construct(private readonly MatchDateWindowService $dateWindow) {}
+
     /** @return Builder<GameMatch> */
     public function publicQuery(Request $request): Builder
     {
@@ -35,9 +36,9 @@ class MatchScheduleService
     /** @return array<string,mixed> */
     public function adminMeta(Request $request): array
     {
-        $base = $this->applyContextFilters(GameMatch::query(), $request);
+        $base = GameMatch::query();
         $timezone = $this->timezone();
-        $today = Carbon::now($timezone)->toDateString();
+        $today = $this->dateWindow->today();
 
         return [
             'timezone' => $timezone,
@@ -78,7 +79,7 @@ class MatchScheduleService
         $timezone = $this->timezone();
         $now = now();
         $soon = $now->copy()->addMinutes((int) config('rifitv.missing_broadcast_alert_minutes', 30));
-        $today = Carbon::now($timezone)->toDateString();
+        $today = $this->dateWindow->today();
 
         $liveWithoutStream = $this->applyContextFilters(GameMatch::query()->publicGraph(), $request)
             ->whereIn('status', [MatchStatus::Live->value, MatchStatus::Halftime->value])
@@ -95,7 +96,7 @@ class MatchScheduleService
             ->limit(5)
             ->get();
 
-        $todayPending = $this->applyContextFilters(GameMatch::query()->publicGraph(), $request)
+        $todayPending = GameMatch::query()->publicGraph()
             ->onLocalDate($today, $timezone)
             ->where('verification_status', 'pending_verification')
             ->scheduleOrder()
@@ -126,7 +127,15 @@ class MatchScheduleService
         $this->applyContextFilters($query, $request);
 
         return $query
-            ->when($request->string('status')->isNotEmpty(), fn (Builder $query) => $query->where('status', $request->string('status')))
+            ->when($request->string('status')->isNotEmpty(), function (Builder $query) use ($request): void {
+                if (in_array($request->string('status')->toString(), ['live', 'active'], true)) {
+                    $query->whereIn('status', [MatchStatus::Live->value, MatchStatus::Halftime->value]);
+
+                    return;
+                }
+
+                $query->where('status', $request->string('status')->toString());
+            })
             ->when($request->has('featured'), fn (Builder $query) => $query->where('featured', $request->boolean('featured')))
             ->when($request->string('channel')->isNotEmpty(), function (Builder $query) use ($request): void {
                 match ($request->string('channel')->toString()) {
@@ -157,11 +166,8 @@ class MatchScheduleService
     private function applyContextFilters(Builder $query, Request $request): Builder
     {
         $timezone = $this->timezone();
-        $date = match ($request->string('date')->toString()) {
-            'today' => Carbon::now($timezone)->toDateString(),
-            'tomorrow' => Carbon::now($timezone)->addDay()->toDateString(),
-            default => $request->string('date')->toString(),
-        };
+        $requestedDate = $request->string('date')->toString();
+        $date = $requestedDate === '' ? '' : $this->dateWindow->normalizeDate($requestedDate);
 
         return $query
             ->when($date !== '', fn (Builder $query) => $query->onLocalDate($date, $timezone))
@@ -181,11 +187,12 @@ class MatchScheduleService
                     ->orWhereHas('competition', fn (Builder $competition) => $competition->where('name', 'like', "%{$search}%")->orWhere('slug', 'like', "%{$search}%"))
                     ->orWhereHas('homeTeam', fn (Builder $team) => $team->where('name', 'like', "%{$search}%")->orWhere('slug', 'like', "%{$search}%"))
                     ->orWhereHas('awayTeam', fn (Builder $team) => $team->where('name', 'like', "%{$search}%")->orWhere('slug', 'like', "%{$search}%")));
-            });
+            })
+            ->when($request->string('territory')->isNotEmpty(), fn (Builder $query) => $query->whereHas('broadcasts', fn (Builder $broadcast) => $broadcast->where('territory', $request->string('territory')->toString())));
     }
 
     private function timezone(): string
     {
-        return (string) config('rifitv.display_timezone', 'Africa/Casablanca');
+        return $this->dateWindow->timezone();
     }
 }

@@ -1,4 +1,5 @@
 import type { Match, MatchStatus } from "./types";
+import { addDays, localDateKey, localTodayDate, adminDateFormatter } from "./footballDate";
 
 export const MATCH_STATUS_LABELS: Record<MatchStatus, string> = {
   scheduled: "Scheduled",
@@ -17,14 +18,6 @@ const statusRank: Record<MatchStatus, number> = {
   postponed: 4,
   cancelled: 5,
 };
-
-const displayTimeZone = "Africa/Casablanca";
-const headingFormatter = new Intl.DateTimeFormat("en-GB", {
-  weekday: "long",
-  day: "numeric",
-  month: "long",
-  timeZone: displayTimeZone,
-});
 
 export type MatchDateGroup = {
   key: string;
@@ -71,16 +64,11 @@ export function matchDateKey(match: Pick<Match, "kickoff_at" | "scheduled_date">
 
 export function dateHeading(dateKey: string, serverDate?: string): string {
   if (dateKey === "tbc") return "Date TBC";
-  if (serverDate && dateKey === serverDate) return `Today - ${headingFormatter.format(new Date(`${dateKey}T12:00:00Z`))}`;
-  if (serverDate && dateKey === addLocalDays(serverDate, 1)) return `Tomorrow - ${headingFormatter.format(new Date(`${dateKey}T12:00:00Z`))}`;
+  const today = serverDate ?? localTodayDate();
+  if (dateKey === today) return `Today - ${adminDateFormatter.format(new Date(`${dateKey}T12:00:00Z`))}`;
+  if (dateKey === addDays(today, 1)) return `Tomorrow - ${adminDateFormatter.format(new Date(`${dateKey}T12:00:00Z`))}`;
 
-  return headingFormatter.format(new Date(`${dateKey}T12:00:00Z`));
-}
-
-export function addLocalDays(dateKey: string, days: number): string {
-  const date = new Date(`${dateKey}T12:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
+  return adminDateFormatter.format(new Date(`${dateKey}T12:00:00Z`));
 }
 
 function groupByCompetition(matches: Match[]): MatchDateGroup["competitions"] {
@@ -101,18 +89,4 @@ function groupByCompetition(matches: Match[]): MatchDateGroup["competitions"] {
 function matchTimestamp(match: Match): number {
   const source = match.kickoff_at ?? (match.scheduled_date ? `${match.scheduled_date}T12:00:00Z` : null);
   return source ? new Date(source).getTime() : Number.MAX_SAFE_INTEGER;
-}
-
-function localDateKey(date: Date): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    timeZone: displayTimeZone,
-  }).formatToParts(date);
-  const year = parts.find((part) => part.type === "year")?.value;
-  const month = parts.find((part) => part.type === "month")?.value;
-  const day = parts.find((part) => part.type === "day")?.value;
-
-  return `${year}-${month}-${day}`;
 }

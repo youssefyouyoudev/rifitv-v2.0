@@ -75,6 +75,10 @@ class FixtureSyncService
             'featured' => $match->hasManualOverride('featured') ? $match->featured : false,
             'published_at' => $match->published_at,
             'visibility' => $match->visibility ?? MatchVisibility::Public,
+            'source_provider' => $match->source_provider ?: $fixture->provider,
+            'source_external_id' => $match->source_external_id ?: $fixture->externalId,
+            'verification_status' => $match->verification_status ?: 'pending_verification',
+            'source_verified_at' => $match->source_verified_at,
             'last_synced_at' => now(),
             'sync_status' => 'synced',
         ]);
@@ -94,7 +98,7 @@ class FixtureSyncService
             return $match;
         }
 
-        if (! $match->published_at) {
+        if (! $match->published_at && in_array($match->verification_status, ['verified', 'manual_verified'], true)) {
             $match->update(['published_at' => now()]);
         }
 
