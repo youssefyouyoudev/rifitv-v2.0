@@ -7,7 +7,7 @@ import { ThemeToggle } from "./ThemeToggle";
 const nav = [
   { href: "/", label: "Home", icon: Home },
   { href: "/live", label: "Live", icon: Radio },
-  { href: "/football/today", label: "Today", icon: CalendarDays },
+  { href: "/matches/today", label: "Today", icon: CalendarDays },
   { href: "/matches", label: "Matches", icon: List },
   { href: "/competitions", label: "Competitions", icon: Trophy },
 ];
@@ -43,7 +43,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
       <main className="mx-auto max-w-[1360px] px-4 pb-24 pt-5 sm:px-6 lg:px-8">{children}</main>
       <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-[var(--border)] bg-[var(--background)] md:hidden" aria-label="Mobile">
-        {nav.slice(0, 3).concat({ href: "/competitions", label: "More", icon: List }).map((item) => {
+        {[nav[0], nav[1], nav[3], nav[4]].map((item) => {
           const Icon = item.icon;
 
           return (

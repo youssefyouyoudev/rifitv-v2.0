@@ -42,7 +42,7 @@ class AdminMatchController extends Controller
 
     public function destroy(Request $request, GameMatch $match, MatchService $service)
     {
-        $request->validate(['confirm_delete' => ['accepted']]);
+        $request->validate(['confirm_delete' => ['required', 'boolean', 'accepted']]);
         $service->archive($match, $request->user());
 
         return response()->json(['data' => ['message' => 'Match archived']]);
@@ -74,13 +74,17 @@ class AdminMatchController extends Controller
     public function bulk(Request $request, MatchService $service)
     {
         abort_unless($request->user()?->hasPermission('matches.manage'), 403);
+        $confirmationRules = $request->input('action') === 'delete'
+            ? ['required', 'boolean', 'accepted']
+            : ['sometimes', 'boolean'];
+
         $validated = $request->validate([
             'ids' => ['required', 'array'],
             'ids.*' => ['integer', 'exists:matches,id'],
             'action' => ['required', 'in:publish,unpublish,feature,unfeature,verify,assign_competition,set_status,delete'],
             'competition_id' => ['required_if:action,assign_competition', 'integer', 'exists:competitions,id'],
             'status' => ['required_if:action,set_status', Rule::in(['scheduled', 'live', 'halftime', 'finished', 'postponed', 'cancelled'])],
-            'confirm_delete' => ['sometimes', 'required_if:action,delete', 'accepted'],
+            'confirm_delete' => $confirmationRules,
         ]);
 
         return response()->json(['data' => ['updated' => $service->bulk($validated['ids'], $validated['action'], $request->user(), $validated)]]);

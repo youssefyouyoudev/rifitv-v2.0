@@ -3,12 +3,16 @@ import { AppShell } from "@/components/AppShell";
 import { CompetitionLogo } from "@/components/CompetitionLogo";
 import { Countdown } from "@/components/Countdown";
 import { JsonLd } from "@/components/JsonLd";
+import { MatchPreferences } from "@/components/MatchPreferences";
 import { TeamMark } from "@/components/TeamMark";
 import { PlayerUI } from "@/features/player/PlayerUI";
+import { ShareButton } from "@/components/ShareButton";
 import { getMatch, getPlayback } from "@/lib/api";
 import { absoluteUrl, SITE_NAME } from "@/lib/site";
 import { formatClockTime, formatMatchDateLabel } from "@/lib/time";
 import type { Match, PlaybackPayload } from "@/lib/types";
+import Link from "next/link";
+import { permanentRedirect } from "next/navigation";
 import { LiveMatchSummary } from "./LiveMatchSummary";
 
 export const dynamic = "force-dynamic";
@@ -16,8 +20,9 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata({ params }: PageProps<"/match/[slug]">): Promise<Metadata> {
   const { slug } = await params;
   const match = await getMatch(slug);
-  const title = `${match.home_team.name} vs ${match.away_team.name} - ${match.competition.name}`;
-  const description = `${match.home_team.name} vs ${match.away_team.name} match information, kickoff time, status and verified broadcast information on RiFiTV.`;
+  const title = `${match.home_team.name} vs ${match.away_team.name} - TV Channel & Kickoff`;
+  const channels = match.channels.map((channel) => channel.name).join(", ");
+  const description = `${match.home_team.name} vs ${match.away_team.name}, ${match.competition.name}: Morocco kickoff time, match status${channels ? ` and TV channels ${channels}` : " and verified broadcast information"} on RiFiTV.`;
   const url = absoluteUrl(`/match/${match.slug}`);
 
   return {
@@ -31,13 +36,17 @@ export async function generateMetadata({ params }: PageProps<"/match/[slug]">): 
 
 export default async function MatchPage({ params }: PageProps<"/match/[slug]">) {
   const { slug } = await params;
-  const [match, playback] = await Promise.all([getMatch(slug), getPlayback(slug)]);
+  const match = await getMatch(slug);
+  if (match.slug !== slug) {
+    permanentRedirect(`/match/${match.slug}`);
+  }
+  const playback = await getPlayback(match.slug);
   const sportsEventJsonLd = {
     "@context": "https://schema.org",
     "@type": "SportsEvent",
     name: `${match.home_team.name} vs ${match.away_team.name}`,
     startDate: match.kickoff_at ?? match.scheduled_date,
-    eventStatus: match.status === "finished" ? "https://schema.org/EventCompleted" : "https://schema.org/EventScheduled",
+    eventStatus: match.status === "finished" ? "https://schema.org/EventCompleted" : match.status === "postponed" ? "https://schema.org/EventPostponed" : match.status === "cancelled" ? "https://schema.org/EventCancelled" : "https://schema.org/EventScheduled",
     competitor: [
       { "@type": "SportsTeam", name: match.home_team.name },
       { "@type": "SportsTeam", name: match.away_team.name },
@@ -60,6 +69,15 @@ export default async function MatchPage({ params }: PageProps<"/match/[slug]">) 
           { "@type": "ListItem", position: 3, name: `${match.home_team.name} vs ${match.away_team.name}`, item: absoluteUrl(`/match/${match.slug}`) },
         ],
       }} />
+      <section className="mb-5 flex flex-wrap items-center justify-between gap-4 border-b border-[var(--border)] pb-4">
+        <div>
+          <Link href={`/competition/${match.competition.slug}`} className="text-sm font-semibold uppercase text-[var(--muted)] hover:text-[var(--foreground)]">{match.competition.name}</Link>
+          <h1 className="mt-1 text-2xl font-black text-[var(--foreground)]">{match.home_team.name} vs {match.away_team.name}</h1>
+          <p className="mt-1 text-sm text-[var(--muted)]">{formatMatchDateLabel(match)} - {match.status_label ?? match.status}</p>
+          <div className="mt-3"><MatchPreferences matchSlug={match.slug} homeTeam={match.home_team} awayTeam={match.away_team} competition={match.competition} kickoffAt={match.kickoff_at} /></div>
+        </div>
+        <ShareButton title={`${match.home_team.name} vs ${match.away_team.name}`} text={`${match.home_team.name} vs ${match.away_team.name} - ${match.competition.name}`} url={absoluteUrl(`/match/${match.slug}`)} />
+      </section>
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
         <section className="space-y-4">
           {canPlay ? (
@@ -76,9 +94,24 @@ export default async function MatchPage({ params }: PageProps<"/match/[slug]">) 
             <LiveMatchSummary initialMatch={match} />
           </div>
           <BroadcastPanel match={match} playback={playback} />
+          <MatchLinks match={match} />
         </aside>
       </div>
     </AppShell>
+  );
+}
+
+function MatchLinks({ match }: { match: Match }) {
+  return (
+    <nav className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5" aria-label="Related match pages">
+      <h2 className="text-sm font-semibold uppercase tracking-normal text-[var(--muted)]">Related pages</h2>
+      <div className="mt-3 flex flex-wrap gap-2 text-sm font-semibold">
+        <Link href={`/team/${match.home_team.slug}`} className="rounded-md border border-[var(--border)] px-3 py-2 text-[var(--foreground)] hover:bg-[var(--surface-muted)]">{match.home_team.name}</Link>
+        <Link href={`/team/${match.away_team.slug}`} className="rounded-md border border-[var(--border)] px-3 py-2 text-[var(--foreground)] hover:bg-[var(--surface-muted)]">{match.away_team.name}</Link>
+        <Link href={`/competition/${match.competition.slug}`} className="rounded-md border border-[var(--border)] px-3 py-2 text-[var(--foreground)] hover:bg-[var(--surface-muted)]">More {match.competition.name}</Link>
+        <Link href="/matches/today" className="rounded-md border border-[var(--border)] px-3 py-2 text-[var(--foreground)] hover:bg-[var(--surface-muted)]">Today&apos;s matches</Link>
+      </div>
+    </nav>
   );
 }
 

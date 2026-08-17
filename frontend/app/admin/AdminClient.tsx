@@ -160,6 +160,18 @@ type QueueHealth = {
   last_stream_check: string | null;
 };
 type DetailedHealth = Record<string, { status: "healthy" | "critical" | "warning"; [key: string]: unknown }>;
+type AnalyticsDashboard = {
+  range_days: number;
+  today_visitors: number;
+  period_unique_visitors: number;
+  returning_visitors: number;
+  event_counts: Record<string, number>;
+  traffic_sources: Record<string, number>;
+  device_categories: Record<string, number>;
+  top_pages: Record<string, number>;
+  top_matches: Record<string, number>;
+  daily: Record<string, { visitors: number; events: number }>;
+};
 
 const sections = [
   { key: "dashboard", label: "Dashboard", group: "Dashboard", icon: Gauge, href: "/admin" },
@@ -178,6 +190,7 @@ const sections = [
   { key: "stream-health", label: "Stream Health", group: "Streaming", icon: Activity, href: "/admin/stream-health" },
   { key: "imports", label: "Imports", group: "Automation", icon: ClipboardList, href: "/admin/imports" },
   { key: "operations", label: "Operations", group: "Automation", icon: ServerCog, href: "/admin/system" },
+  { key: "analytics", label: "Growth Analytics", group: "Automation", icon: Activity, href: "/admin/analytics" },
   { key: "users", label: "Users", group: "System", icon: Shield, href: "/admin/users" },
   { key: "settings", label: "Settings", group: "System", icon: Settings, href: "/admin/settings" },
   { key: "audit", label: "Audit Log", group: "System", icon: ClipboardList, href: "/admin/audit-log" },
@@ -213,6 +226,7 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
   const [fixtureImports, setFixtureImports] = useState<FixtureImport[]>([]);
   const [queueHealth, setQueueHealth] = useState<QueueHealth | null>(null);
   const [detailedHealth, setDetailedHealth] = useState<DetailedHealth | null>(null);
+  const [analytics, setAnalytics] = useState<AnalyticsDashboard | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const active = activeOverride ?? currentRoute.active;
@@ -384,13 +398,12 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
         return;
       }
       case "matches": {
-        const [matchList, teamList, competitionList, channelList] = await Promise.all([
-          adminGet<ApiList<Match>>("/admin/matches?per_page=50"),
+        const [teamList, competitionList, channelList] = await Promise.all([
           adminGet<ApiList<Entity>>("/admin/teams?per_page=100"),
           adminGet<ApiList<Entity>>("/admin/competitions?per_page=100"),
           adminGet<ApiList<Entity>>("/admin/channels?per_page=100"),
         ]);
-        setMatches(matchList.data);
+        setMatches([]);
         setTeams(teamList.data);
         setCompetitions(competitionList.data);
         setChannels(channelList.data);
@@ -460,6 +473,10 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
         setSyncRuns(runList.data);
         setQueueHealth(queue.data);
         setDetailedHealth(appHealth.data);
+        return;
+      }
+      case "analytics": {
+        setAnalytics((await adminGet<ApiOne<AnalyticsDashboard>>("/admin/analytics?days=7")).data);
         return;
       }
       case "homepage": {
@@ -639,6 +656,7 @@ export function AdminClient({ initialSection = "dashboard" }: { initialSection?:
           {active === "stream-health" ? <StreamHealthView sources={streamHealth} run={run} adminSend={adminSend} /> : null}
           {active === "imports" ? <ImportReviewView imports={fixtureImports} syncRuns={syncRuns} run={run} adminSend={adminSend} /> : null}
           {active === "operations" ? <OperationsView alerts={alerts} queueHealth={queueHealth} detailedHealth={detailedHealth} syncRuns={syncRuns} run={run} adminSend={adminSend} /> : null}
+          {active === "analytics" ? <GrowthAnalyticsView analytics={analytics} /> : null}
           {active === "homepage" ? <HomepageManager competitions={competitions} matches={matches} run={run} adminSend={adminSend} /> : null}
           {active === "announcements" ? <AnnouncementManager run={run} adminSend={adminSend} /> : null}
           {active === "users" ? <UserManager run={run} adminSend={adminSend} /> : null}
@@ -702,6 +720,40 @@ function DashboardView({ dashboard, setActive }: { dashboard: Dashboard | null; 
       </div>
     </div>
   );
+}
+
+function GrowthAnalyticsView({ analytics }: { analytics: AnalyticsDashboard | null }) {
+  if (!analytics) {
+    return <Panel title="Growth Analytics"><p className="text-sm text-neutral-400">Analytics data is loading. No values are estimated.</p></Panel>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Stat label="visitors today" value={analytics.today_visitors} />
+        <Stat label={`${analytics.range_days}-day visitors`} value={analytics.period_unique_visitors} />
+        <Stat label="returning visitors" value={analytics.returning_visitors} />
+      </div>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Panel title="Daily activity">
+          {Object.entries(analytics.daily).reverse().map(([date, values]) => <CardLine key={date} title={date} meta={`${values.visitors} visitors | ${values.events} events`} />)}
+          {Object.keys(analytics.daily).length === 0 ? <p className="text-sm text-neutral-400">No visitor events have been collected yet.</p> : null}
+        </Panel>
+        <Panel title="Event counts"><MetricList values={analytics.event_counts} /></Panel>
+        <Panel title="Traffic sources"><MetricList values={analytics.traffic_sources} /></Panel>
+        <Panel title="Devices"><MetricList values={analytics.device_categories} /></Panel>
+        <Panel title="Top landing paths"><MetricList values={analytics.top_pages} /></Panel>
+        <Panel title="Popular matches"><MetricList values={analytics.top_matches} /></Panel>
+      </div>
+      <p className="text-xs text-neutral-500">Values come from the RiFiTV first-party event pipeline for the last {analytics.range_days} days. Search Console, ad platforms and external attribution are not inferred here.</p>
+    </div>
+  );
+}
+
+function MetricList({ values }: { values: Record<string, number> }) {
+  const entries = Object.entries(values);
+
+  return entries.length > 0 ? <div className="space-y-2">{entries.map(([label, value]) => <CardLine key={label} title={label} meta={String(value)} />)}</div> : <p className="text-sm text-neutral-400">No data collected yet.</p>;
 }
 
 function TodayOperationsView({ today, setActive, run, adminSend, openControl }: ManagerProps & { today: TodayOps | null; setActive: (key: string) => void; openControl: (matchId: number) => void }) {
@@ -992,6 +1044,10 @@ function MatchManager({ matches, teams, competitions, channels, run, adminGet, a
     .filter((channel) => String(channel.name ?? "").toLowerCase().includes(channelSearch.toLowerCase()))
     .slice(0, 40);
   const filterSummary = `${page.total} ${page.total === 1 ? "match" : "matches"} | ${meta?.timezone ?? "Africa/Casablanca"}`;
+  const selectedDate = filters.date || localTodayDate();
+  const previousDate = addDays(selectedDate, -1);
+  const tomorrowDate = addDays(selectedDate, 1);
+  const nextDate = addDays(selectedDate, 2);
 
   return (
     <div className="space-y-5">
@@ -1024,17 +1080,17 @@ function MatchManager({ matches, teams, competitions, channels, run, adminGet, a
       <div className="grid gap-5 xl:grid-cols-[360px_1fr]">
         <div className="space-y-5">
           <Panel title="Date">
-            <div className="grid grid-cols-[44px_minmax(0,1fr)_minmax(0,1fr)_44px] gap-2">
-              <button className="grid h-12 place-items-center rounded-md border border-white/10 bg-black/20 text-white" aria-label="Previous day" title="Previous day" onClick={() => updateFilters({ date: addDays(filters.date || localTodayDate(), -1) })}><ArrowLeft className="h-4 w-4" /></button>
-              <button className={`h-12 rounded-md border px-2 text-center ${filters.date === localTodayDate() ? "border-red-400 bg-red-600/20 text-white" : "border-white/10 bg-black/20 text-neutral-300"}`} onClick={() => updateFilters({ date: localTodayDate() })}>
-                <span className="block text-xs font-semibold">{formatAdminDateChip(filters.date)}</span>
-                <span className="block text-[10px] uppercase text-neutral-400">{filters.date === localTodayDate() ? "Today" : "Selected"}</span>
+            <div className="grid grid-cols-4 gap-2">
+              <button className="h-12 rounded-md border border-white/10 bg-black/20 px-1 text-center text-white" aria-label="Previous day" title="Previous day" onClick={() => updateFilters({ date: previousDate })}><ArrowLeft className="mr-1 inline h-4 w-4" /><span className="text-[10px] font-semibold">{formatAdminDateChip(previousDate)}</span></button>
+              <button className={`h-12 rounded-md border px-2 text-center ${selectedDate === localTodayDate() ? "border-red-400 bg-red-600/20 text-white" : "border-white/10 bg-black/20 text-neutral-300"}`} onClick={() => updateFilters({ date: selectedDate })}>
+                <span className="block text-xs font-semibold">{formatAdminDateChip(selectedDate)}</span>
+                <span className="block text-[10px] uppercase text-neutral-400">{selectedDate === localTodayDate() ? "Today" : "Selected"}</span>
               </button>
-              <button className="h-12 rounded-md border border-white/10 bg-black/20 px-2 text-center text-neutral-300" onClick={() => updateFilters({ date: addDays(filters.date || localTodayDate(), 1) })}>
-                <span className="block text-xs font-semibold">{formatAdminDateChip(addDays(filters.date || localTodayDate(), 1))}</span>
+              <button className="h-12 rounded-md border border-white/10 bg-black/20 px-2 text-center text-neutral-300" onClick={() => updateFilters({ date: tomorrowDate })}>
+                <span className="block text-xs font-semibold">{formatAdminDateChip(tomorrowDate)}</span>
                 <span className="block text-[10px] uppercase text-neutral-400">Tomorrow</span>
               </button>
-              <button className="grid h-12 place-items-center rounded-md border border-white/10 bg-black/20 text-white" aria-label="Next day" title="Next day" onClick={() => updateFilters({ date: addDays(filters.date || localTodayDate(), 1) })}><ArrowRight className="h-4 w-4" /></button>
+              <button className="h-12 rounded-md border border-white/10 bg-black/20 px-1 text-center text-white" aria-label="Next day" title="Next day" onClick={() => updateFilters({ date: nextDate })}><span className="text-[10px] font-semibold">{formatAdminDateChip(nextDate)}</span><ArrowRight className="ml-1 inline h-4 w-4" /></button>
             </div>
             <label className="flex h-10 items-center justify-center gap-2 rounded-md border border-white/10 bg-black/20 px-3 text-sm text-neutral-300">
               <CalendarDays className="h-4 w-4" />
@@ -1199,7 +1255,7 @@ function AdminMatchCard({ match, checked, onCheck, openControl, openAssign, onDe
   const score = match.status === "finished" || match.status === "live" || match.status === "halftime"
     ? `${match.home_score ?? 0} - ${match.away_score ?? 0}`
     : "vs";
-  const healthLabel = summary ? `${summary.healthy_sources} / ${summary.enabled_sources} healthy` : "Not configured";
+  const healthLabel = summary && summary.enabled_sources > 0 ? `${summary.healthy_sources} / ${summary.enabled_sources} healthy` : "Not configured";
 
   function runSecondary(action: () => Promise<void>, success: string) {
     setMoreOpen(false);

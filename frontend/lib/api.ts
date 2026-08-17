@@ -4,7 +4,13 @@ const API_BASE = process.env.NEXT_PUBLIC_RIFITV_API_BASE ?? "http://127.0.0.1:80
 const API_ORIGIN = apiOrigin(API_BASE);
 
 type ApiEnvelope<T> = { data: T };
-type Paginated<T> = { data: T[] };
+type Paginated<T> = {
+  data: T[];
+  meta?: {
+    current_page?: number;
+    last_page?: number;
+  };
+};
 type ApiRequestOptions = RequestInit & { timeoutMs?: number };
 
 export class ApiError extends Error {
@@ -115,7 +121,7 @@ export async function getHome(): Promise<HomePayload> {
   return (await apiGet<ApiEnvelope<HomePayload>>("/home")).data;
 }
 
-export async function getMatches(status?: string, competition?: string, date?: string, search?: string, territory?: string): Promise<Match[]> {
+async function getMatchesPage(status?: string, competition?: string, date?: string, search?: string, territory?: string, page = 1): Promise<Paginated<Match>> {
   const params = new URLSearchParams();
   if (status) {
     params.set("status", status);
@@ -133,9 +139,29 @@ export async function getMatches(status?: string, competition?: string, date?: s
     params.set("territory", territory);
   }
   params.set("per_page", "50");
+  params.set("page", String(page));
   const query = params.toString() ? `?${params.toString()}` : "";
 
-  return (await apiGet<Paginated<Match>>(`/matches${query}`)).data;
+  return apiGet<Paginated<Match>>(`/matches${query}`);
+}
+
+export async function getMatches(status?: string, competition?: string, date?: string, search?: string, territory?: string): Promise<Match[]> {
+  return (await getMatchesPage(status, competition, date, search, territory)).data;
+}
+
+export async function getAllMatchesForSitemap(): Promise<Match[]> {
+  const firstPage = await getMatchesPage();
+  const lastPage = firstPage.meta?.last_page ?? 1;
+
+  if (lastPage <= 1) {
+    return firstPage.data;
+  }
+
+  const remainingPages = await Promise.all(
+    Array.from({ length: lastPage - 1 }, (_, index) => getMatchesPage(undefined, undefined, undefined, undefined, undefined, index + 2)),
+  );
+
+  return [firstPage, ...remainingPages].flatMap((page) => page.data);
 }
 
 export async function getMatch(slug: string): Promise<Match> {

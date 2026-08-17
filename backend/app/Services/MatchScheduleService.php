@@ -104,7 +104,7 @@ class MatchScheduleService
             'upcoming' => "Upcoming {$days} days",
             'finished' => 'Finished (all)',
             'needs_channel' => "Needs channel ({$days} days)",
-            'needs_verification' => 'Needs verification',
+            'needs_verification' => 'Needs verification (all)',
             'featured' => 'Featured',
         ];
     }
@@ -116,15 +116,17 @@ class MatchScheduleService
         $now = now();
         $soon = $now->copy()->addMinutes((int) config('rifitv.missing_broadcast_alert_minutes', 30));
         $today = $this->dateWindow->today();
+        $requestedDate = $request->string('date')->toString();
+        $attentionDate = $requestedDate !== '' ? $this->dateWindow->normalizeDate($requestedDate) : $today;
 
-        $liveWithoutStream = $this->applyContextFilters(GameMatch::query()->publicGraph(), $request, false)
+        $liveWithoutStream = $this->applyContextFilters(GameMatch::query()->publicGraph(), $request)
             ->whereIn('status', [MatchStatus::Live->value, MatchStatus::Halftime->value])
             ->whereDoesntHave('channels.streamSources', fn (Builder $query) => $query->where('enabled', true)->where('last_known_status', 'healthy'))
             ->scheduleOrder()
             ->limit(5)
             ->get();
 
-        $soonWithoutChannel = $this->applyContextFilters(GameMatch::query()->publicGraph(), $request, false)
+        $soonWithoutChannel = $this->applyContextFilters(GameMatch::query()->publicGraph(), $request)
             ->where('status', MatchStatus::Scheduled->value)
             ->whereBetween('kickoff_at', [$now, $soon])
             ->doesntHave('channels')
@@ -132,7 +134,7 @@ class MatchScheduleService
             ->limit(5)
             ->get();
 
-        $soonWithoutStream = $this->applyContextFilters(GameMatch::query()->publicGraph(), $request, false)
+        $soonWithoutStream = $this->applyContextFilters(GameMatch::query()->publicGraph(), $request)
             ->where('status', MatchStatus::Scheduled->value)
             ->whereBetween('kickoff_at', [$now, $soon])
             ->whereHas('channels')
@@ -141,14 +143,22 @@ class MatchScheduleService
             ->limit(5)
             ->get();
 
-        $todayPending = $this->applyContextFilters(GameMatch::query()->publicGraph(), $request, false)
-            ->onLocalDate($today, $timezone)
+        $todayWithoutChannel = $this->applyContextFilters(GameMatch::query()->publicGraph(), $request)
+            ->onLocalDate($attentionDate, $timezone)
+            ->where('status', MatchStatus::Scheduled->value)
+            ->doesntHave('channels')
+            ->scheduleOrder()
+            ->limit(5)
+            ->get();
+
+        $todayPending = $this->applyContextFilters(GameMatch::query()->publicGraph(), $request)
+            ->onLocalDate($attentionDate, $timezone)
             ->whereIn('verification_status', ['pending_verification', 'problem'])
             ->scheduleOrder()
             ->limit(5)
             ->get();
 
-        $conflicts = $this->applyContextFilters(GameMatch::query()->publicGraph(), $request, false)
+        $conflicts = $this->applyContextFilters(GameMatch::query()->publicGraph(), $request)
             ->whereNotNull('kickoff_at')
             ->whereNotNull('scheduled_date')
             ->scheduleOrder()
@@ -160,6 +170,7 @@ class MatchScheduleService
         return $liveWithoutStream
             ->concat($soonWithoutChannel)
             ->concat($soonWithoutStream)
+            ->concat($todayWithoutChannel)
             ->concat($todayPending)
             ->concat($conflicts)
             ->unique('id')

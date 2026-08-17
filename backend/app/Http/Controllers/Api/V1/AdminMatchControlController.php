@@ -9,6 +9,7 @@ use App\Models\GameMatch;
 use App\Services\AuditService;
 use App\Services\LiveMatchService;
 use App\Services\MatchControlService;
+use App\Services\MatchService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -88,12 +89,12 @@ class AdminMatchControlController extends Controller
         return response()->json(['data' => $service->payload($updated)]);
     }
 
-    public function feature(Request $request, GameMatch $match, MatchControlService $service, AuditService $audit)
+    public function feature(Request $request, GameMatch $match, MatchControlService $service, MatchService $matches, AuditService $audit)
     {
         abort_unless($request->user()?->hasPermission('matches.manage'), 403);
         $validated = $request->validate(['featured' => ['required', 'boolean']]);
         $before = $match->featured;
-        $match->update(['featured' => $validated['featured']]);
+        $matches->setFeatured($match, $validated['featured']);
         $audit->record($request->user(), $validated['featured'] ? 'match.featured' : 'match.unfeatured', $match, ['before' => $before]);
 
         return response()->json(['data' => $service->payload($match->fresh())]);

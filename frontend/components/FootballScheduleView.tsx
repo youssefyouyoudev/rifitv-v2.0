@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { AppShell } from "./AppShell";
 import { MatchCard } from "./MatchCard";
+import { JsonLd } from "./JsonLd";
 import { groupMatchesByDate } from "@/lib/matches";
+import { absoluteUrl } from "@/lib/site";
 import type { Competition, Match } from "@/lib/types";
 
 export function FootballScheduleView({
@@ -10,17 +12,37 @@ export function FootballScheduleView({
   matches,
   competitions,
   serverDate,
+  activeDate = "today",
+  canonicalPath,
 }: {
   title: string;
   description: string;
   matches: Match[];
   competitions: Competition[];
   serverDate?: string;
+  activeDate?: "today" | "tomorrow";
+  canonicalPath?: string;
 }) {
   const groups = groupMatchesByDate(matches, serverDate);
+  const scheduleJsonLd = canonicalPath ? {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: title,
+    url: absoluteUrl(canonicalPath),
+    mainEntity: {
+      "@type": "ItemList",
+      itemListElement: matches.slice(0, 20).map((match, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        name: `${match.home_team.name} vs ${match.away_team.name}`,
+        url: absoluteUrl(`/match/${match.slug}`),
+      })),
+    },
+  } : null;
 
   return (
     <AppShell>
+      {scheduleJsonLd ? <JsonLd id={`schedule-${activeDate}`} data={scheduleJsonLd} /> : null}
       <div className="space-y-6">
         <section className="flex flex-wrap items-end justify-between gap-4 border-b border-[var(--border)] pb-5">
           <div>
@@ -32,7 +54,8 @@ export function FootballScheduleView({
           </Link>
         </section>
         <div className="flex gap-2 overflow-x-auto pb-1">
-          <Link href="/football/today" className="inline-flex h-9 shrink-0 items-center rounded-md bg-[var(--brand-blue)] px-3 text-sm font-semibold text-white">Today</Link>
+          <Link href="/matches/today" className={`inline-flex h-9 shrink-0 items-center rounded-md px-3 text-sm font-semibold ${activeDate === "today" ? "bg-[var(--brand-blue)] text-white" : "border border-[var(--border)] text-[var(--foreground)]"}`}>Today</Link>
+          <Link href="/matches/tomorrow" className={`inline-flex h-9 shrink-0 items-center rounded-md px-3 text-sm font-semibold ${activeDate === "tomorrow" ? "bg-[var(--brand-blue)] text-white" : "border border-[var(--border)] text-[var(--foreground)]"}`}>Tomorrow</Link>
           <Link href="/matches?status=live" className="inline-flex h-9 shrink-0 items-center rounded-md border border-[var(--border)] px-3 text-sm font-semibold text-[var(--foreground)]">Live</Link>
           <Link href="/matches?status=scheduled" className="inline-flex h-9 shrink-0 items-center rounded-md border border-[var(--border)] px-3 text-sm font-semibold text-[var(--foreground)]">Upcoming</Link>
           <Link href="/matches?status=finished" className="inline-flex h-9 shrink-0 items-center rounded-md border border-[var(--border)] px-3 text-sm font-semibold text-[var(--foreground)]">Results</Link>

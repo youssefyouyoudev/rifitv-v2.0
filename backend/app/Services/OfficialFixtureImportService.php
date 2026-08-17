@@ -18,7 +18,10 @@ use Illuminate\Support\Str;
 
 class OfficialFixtureImportService
 {
-    public function __construct(private readonly FootballProductionAuditService $productionAudit) {}
+    public function __construct(
+        private readonly FootballProductionAuditService $productionAudit,
+        private readonly MatchSlugService $slugs,
+    ) {}
 
     /** @var array<string, array{name:string,short_name:string,country_code:?string,logo_path:string,sort_order:int,selection_mode:CompetitionSelectionMode}> */
     private array $competitions = [
@@ -330,12 +333,13 @@ class OfficialFixtureImportService
             'visibility' => $verified ? MatchVisibility::Public : MatchVisibility::Internal,
             'seo_title' => "{$home->name} vs {$away->name} - {$competition->name}",
             'seo_description' => "{$home->name} vs {$away->name} {$competition->name} fixture information on RiFiTV.",
-            'slug' => Str::slug(Str::ascii("{$home->name} vs {$away->name} {$competition->slug} {$season->slug} {$fixture['external_id']}")),
+            'slug' => $match->slug ?: $this->slugs->uniqueSlug($home->name, $away->name, $kickoffAt, $fixture['scheduled_date']),
             'sync_status' => 'imported',
             'last_synced_at' => now(),
         ]);
         $match->forceFill(['deleted_at' => null]);
         $match->save();
+        $this->slugs->assign($match);
 
         return $match;
     }

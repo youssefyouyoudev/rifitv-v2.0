@@ -41,11 +41,14 @@ class PublicContentService
         $window = $this->dateWindow->bounds($localDate);
 
         $base = GameMatch::query()->published()->publicGraph();
-        $today = (clone $base)
+        $todayQuery = (clone $base)
             ->onLocalDate($localDate)
-            ->scheduleOrder()
-            ->limit(24)
-            ->get();
+            ->scheduleOrder();
+        $todayCount = (clone $todayQuery)->count();
+        $liveCount = (clone $todayQuery)
+            ->whereIn('status', [MatchStatus::Live, MatchStatus::Halftime])
+            ->count();
+        $today = (clone $todayQuery)->limit(24)->get();
 
         return [
             'server_time' => $now->toIso8601String(),
@@ -53,8 +56,8 @@ class PublicContentService
             'date_label' => $localNow->isoFormat('dddd, D MMMM'),
             'timezone' => $timezone,
             'matches' => $today,
-            'live_count' => $today->whereIn('status', [MatchStatus::Live, MatchStatus::Halftime])->count(),
-            'today_count' => $today->count(),
+            'live_count' => $liveCount,
+            'today_count' => $todayCount,
             'next_match' => (clone $base)
                 ->where(fn ($query) => $query
                     ->where('kickoff_at', '>', $window['end'])

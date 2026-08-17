@@ -10,7 +10,10 @@ use Illuminate\Validation\ValidationException;
 
 class LiveMatchService
 {
-    public function __construct(private readonly AuditService $audit) {}
+    public function __construct(
+        private readonly AuditService $audit,
+        private readonly PublicContentService $content,
+    ) {}
 
     public function update(GameMatch $match, array $data, ?User $actor): GameMatch
     {
@@ -37,6 +40,7 @@ class LiveMatchService
         $match->update($payload);
 
         $this->audit->record($actor, 'match.live_control_updated', $match, ['before' => $before]);
+        $this->content->forgetHome();
 
         return $match->fresh(['competition', 'homeTeam', 'awayTeam', 'channels.streamSources', 'broadcasts.broadcaster', 'broadcasts.channel']);
     }

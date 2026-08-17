@@ -21,6 +21,7 @@ class FixtureSyncService
         private readonly StatusNormalizer $statuses,
         private readonly PublicContentService $content,
         private readonly OperationalAlertService $alerts,
+        private readonly MatchSlugService $slugs,
     ) {}
 
     public function sync(CarbonImmutable $from, CarbonImmutable $to): SyncRun
@@ -71,7 +72,7 @@ class FixtureSyncService
             'home_score' => $match->hasManualOverride('score') ? $match->home_score : $fixture->homeScore,
             'away_score' => $match->hasManualOverride('score') ? $match->away_score : $fixture->awayScore,
             'minute' => $match->hasManualOverride('score') ? $match->minute : $fixture->minute,
-            'slug' => $match->slug ?: Str::slug($home->name.' vs '.$away->name.' '.$fixture->externalId),
+            'slug' => $match->slug ?: $this->slugs->uniqueSlug($home->name, $away->name, $fixture->kickoffAt),
             'featured' => $match->hasManualOverride('featured') ? $match->featured : false,
             'published_at' => $match->published_at,
             'visibility' => $match->visibility ?? MatchVisibility::Public,
@@ -89,6 +90,7 @@ class FixtureSyncService
         }
 
         $match->save();
+        $this->slugs->assign($match);
         $match->load('competition');
 
         if (! $this->rules->qualifies($match) && ! $match->featured) {

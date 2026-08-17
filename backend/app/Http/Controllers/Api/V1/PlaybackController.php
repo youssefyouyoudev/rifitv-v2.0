@@ -13,7 +13,7 @@ class PlaybackController extends Controller
         $match = GameMatch::query()
             ->with(['channels.streamSources'])
             ->published()
-            ->where('slug', $slug)
+            ->slugOrLegacy($slug)
             ->firstOrFail();
 
         return response()->json(['data' => $selector->responseFor($match)]);

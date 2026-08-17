@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\HealthController;
+use App\Http\Controllers\Api\V1\AdminAnalyticsController;
 use App\Http\Controllers\Api\V1\AdminAnnouncementController;
 use App\Http\Controllers\Api\V1\AdminAuditLogController;
 use App\Http\Controllers\Api\V1\AdminChannelController;
@@ -17,6 +18,7 @@ use App\Http\Controllers\Api\V1\AdminStreamSourceController;
 use App\Http\Controllers\Api\V1\AdminTeamController;
 use App\Http\Controllers\Api\V1\AdminUploadController;
 use App\Http\Controllers\Api\V1\AdminUserController;
+use App\Http\Controllers\Api\V1\AnalyticsEventController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CompetitionController;
 use App\Http\Controllers\Api\V1\HomeController;
@@ -43,6 +45,7 @@ Route::prefix('v1')->group(function (): void {
     Route::get('search', SearchController::class)->middleware('throttle:search');
     Route::get('matches/{slug}/playback', PlaybackController::class)->middleware('throttle:playback');
     Route::post('playback/events', PlaybackEventController::class)->middleware('throttle:playback-events');
+    Route::post('analytics/events', AnalyticsEventController::class)->middleware('throttle:analytics');
 
     Route::post('auth/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
@@ -53,6 +56,7 @@ Route::prefix('v1')->group(function (): void {
         Route::middleware('admin')->prefix('admin')->group(function (): void {
             Route::get('health', [HealthController::class, 'detailed']);
             Route::get('dashboard', AdminDashboardController::class);
+            Route::get('analytics', AdminAnalyticsController::class);
             Route::get('search', AdminSearchController::class);
             Route::get('today', [AdminOperationsController::class, 'today']);
             Route::get('stream-health', [AdminOperationsController::class, 'streamHealth']);

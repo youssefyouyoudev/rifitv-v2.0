@@ -9,20 +9,20 @@ import type { Match } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Football Matches, Fixtures & Live Match Information",
-  description: "Follow supported football matches with kickoff times, match status, scores and verified broadcast information on RiFiTV.",
+  title: "Today's Football Matches & TV Channels in Morocco",
+  description: "See today's football matches, Morocco kickoff times, live scores and verified TV channel information for LaLiga, Premier League, Champions League and MENA fixtures.",
   alternates: { canonical: absoluteUrl("/") },
   openGraph: {
     type: "website",
     siteName: SITE_NAME,
-    title: "RiFiTV - Football Matches, Fixtures & Live Match Information",
-    description: "Supported football fixtures, match status, scores and verified broadcast information.",
+    title: "Today's Football Matches & TV Channels in Morocco | RiFiTV",
+    description: "Today's football fixtures, Morocco kickoff times, live status and verified TV channel information.",
     url: absoluteUrl("/"),
   },
   twitter: {
     card: "summary_large_image",
-    title: "RiFiTV - Football Matches, Fixtures & Live Match Information",
-    description: "Supported football fixtures, match status, scores and verified broadcast information.",
+    title: "Today's Football Matches & TV Channels in Morocco | RiFiTV",
+    description: "Today's football fixtures, Morocco kickoff times, live status and verified TV channel information.",
   },
 };
 
@@ -58,6 +58,8 @@ export default async function Home() {
           </div>
         </section>
 
+        <HomeSignal match={live[0] ?? scheduled[0] ?? home.next_match} live={live.length > 0} />
+
         <div className="flex gap-2 overflow-x-auto pb-1">
           <span className="inline-flex h-9 shrink-0 items-center rounded-md bg-[var(--brand-blue)] px-3 text-sm font-semibold text-white">All</span>
           {home.competitions.map((competition) => (
@@ -81,6 +83,23 @@ export default async function Home() {
         )}
       </div>
     </AppShell>
+  );
+}
+
+function HomeSignal({ match, live }: { match: Match | null | undefined; live: boolean }) {
+  if (!match) {
+    return <section className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5 text-sm text-[var(--muted)]">No upcoming broadcast is available yet. Browse the full schedule for the latest fixtures.</section>;
+  }
+
+  return (
+    <section className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-[var(--live)]/25 bg-[var(--surface)] p-5">
+      <div>
+        <p className={`text-xs font-semibold uppercase ${live ? "text-[var(--live)]" : "text-[var(--muted)]"}`}>{live ? "Live now" : "Next match"}</p>
+        <h2 className="mt-1 text-xl font-bold text-[var(--foreground)]">{match.home_team.name} vs {match.away_team.name}</h2>
+        <p className="mt-1 text-sm text-[var(--muted)]">{match.competition.name} - {match.status_label ?? "Scheduled"}</p>
+      </div>
+      <Link href={`/match/${match.slug}`} className="inline-flex min-h-10 items-center rounded-md bg-[var(--brand-blue)] px-4 text-sm font-semibold text-white">{live ? "Watch live" : "View match"}</Link>
+    </section>
   );
 }
 

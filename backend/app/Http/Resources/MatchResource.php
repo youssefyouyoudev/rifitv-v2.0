@@ -134,11 +134,16 @@ class MatchResource extends JsonResource
             ? $dateWindow->dateForInstant($this->kickoff_at)
             : $this->scheduled_date?->toDateString();
 
-        if ($this->kickoff_at && $this->status === MatchStatus::Scheduled && $now->lte($this->kickoff_at) && $now->diffInMinutes($this->kickoff_at, false) <= 30 && $summary['channels'] === 0) {
-            $warnings[] = 'Match starts in 30 min but has no channel';
+        $startsWithin30Minutes = $this->kickoff_at
+            && $this->status === MatchStatus::Scheduled
+            && $now->lte($this->kickoff_at)
+            && $now->diffInMinutes($this->kickoff_at, false) <= 30;
+
+        if ($this->status === MatchStatus::Scheduled && $summary['channels'] === 0 && $matchDate === $today) {
+            $warnings[] = $startsWithin30Minutes ? 'Match starts in 30 min but has no channel' : "Today's match has no channel";
         }
 
-        if ($this->kickoff_at && $this->status === MatchStatus::Scheduled && $now->lte($this->kickoff_at) && $now->diffInMinutes($this->kickoff_at, false) <= 30 && $summary['channels'] > 0 && $summary['healthy_sources'] === 0) {
+        if ($startsWithin30Minutes && $summary['channels'] > 0 && $summary['healthy_sources'] === 0) {
             $warnings[] = 'Match starts in 30 min but has no healthy stream';
         }
 

@@ -20,7 +20,7 @@ class MatchController extends Controller
 
     public function show(string $slug)
     {
-        $match = GameMatch::query()->published()->publicGraph()->where('slug', $slug)->firstOrFail();
+        $match = GameMatch::query()->published()->publicGraph()->slugOrLegacy($slug)->firstOrFail();
 
         return new MatchResource($match);
     }

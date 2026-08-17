@@ -115,7 +115,12 @@ export function PlayerUI({ playback, title }: { playback: PlaybackPayload; title
           className="h-10 min-w-40 rounded-md border border-white/10 bg-neutral-900 px-3 text-sm text-white outline-none focus-visible:ring-2 focus-visible:ring-red-300"
           value={activeSourceId ?? ""}
           aria-label="Broadcast source"
-          onChange={(event) => void engineRef.current?.selectSource(Number(event.target.value))}
+          onChange={(event) => {
+            const sourceId = Number(event.target.value);
+            activeSourceRef.current = sourceId;
+            trackEvent("channel_switched", { match_slug: playback.match_slug, source_id: sourceId });
+            void engineRef.current?.selectSource(sourceId);
+          }}
         >
           {playback.sources.map((source) => (
             <option key={source.id} value={source.id}>

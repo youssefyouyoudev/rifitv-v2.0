@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { AnalyticsPageView } from "@/components/AnalyticsPageView";
 import { JsonLd } from "@/components/JsonLd";
 import { ThemeScript } from "@/components/ThemeScript";
 import { absoluteUrl, SITE_NAME, SITE_URL } from "@/lib/site";
@@ -71,6 +72,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <ThemeScript />
         <JsonLd id="rifitv-organization" data={organizationJsonLd} />
         <JsonLd id="rifitv-website" data={websiteJsonLd} />
+        <AnalyticsPageView />
         {children}
       </body>
     </html>

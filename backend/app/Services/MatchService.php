@@ -5,18 +5,30 @@ namespace App\Services;
 use App\Enums\MatchStatus;
 use App\Enums\MatchVisibility;
 use App\Models\GameMatch;
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class MatchService
 {
-    public function __construct(private readonly AuditService $audit) {}
+    public function __construct(
+        private readonly AuditService $audit,
+        private readonly MatchSlugService $slugs,
+        private readonly PublicContentService $content,
+    ) {}
 
     public function create(array $data, ?User $actor): GameMatch
     {
-        $match = GameMatch::query()->create($this->payload($data));
+        $payload = $this->payload($data);
+        $home = Team::query()->findOrFail((int) $data['home_team_id']);
+        $away = Team::query()->findOrFail((int) $data['away_team_id']);
+        $payload['slug'] = $this->slugs->uniqueSlug($home->name, $away->name, $payload['kickoff_at'], $payload['scheduled_date']);
+        $match = GameMatch::query()->create($payload);
+        $this->slugs->assign($match);
         $this->syncChannels($match, $data['channel_ids'] ?? []);
+        $this->content->forgetHome();
         $this->audit->record($actor, 'match.created', $match, ['slug' => $match->slug]);
 
         return $match->fresh(['competition', 'homeTeam', 'awayTeam', 'channels.streamSources']);
@@ -24,14 +36,16 @@ class MatchService
 
     public function update(GameMatch $match, array $data, ?User $actor): GameMatch
     {
-        $before = $match->only(['status', 'home_score', 'away_score', 'minute', 'published_at', 'featured']);
+        $before = $match->only(['status', 'home_score', 'away_score', 'minute', 'published_at', 'featured', 'slug']);
         $match->update($this->payload($data, $match));
+        $this->slugs->assign($match);
 
         if (array_key_exists('channel_ids', $data)) {
             $this->syncChannels($match, $data['channel_ids']);
         }
 
         $this->audit->record($actor, 'match.updated', $match, ['before' => $before]);
+        $this->content->forgetHome();
 
         return $match->fresh(['competition', 'homeTeam', 'awayTeam', 'channels.streamSources']);
     }
@@ -44,6 +58,7 @@ class MatchService
             'visibility' => $visibility ?? ($published ? MatchVisibility::Public : $match->visibility),
         ]);
         $this->audit->record($actor, $published ? 'match.published' : 'match.unpublished', $match, ['before' => $before]);
+        $this->content->forgetHome();
 
         return $match->fresh(['competition', 'homeTeam', 'awayTeam', 'channels.streamSources']);
     }
@@ -51,7 +66,7 @@ class MatchService
     public function duplicate(GameMatch $match, ?User $actor): GameMatch
     {
         $copy = $match->replicate(['slug', 'home_score', 'away_score', 'minute', 'status', 'published_at', 'source_external_id', 'source_hash']);
-        $copy->slug = $this->uniqueSlug($match->homeTeam->name.' vs '.$match->awayTeam->name.' copy');
+        $copy->slug = $match->slug.'-copy-'.Str::lower(Str::random(8));
         $copy->status = MatchStatus::Scheduled;
         $copy->home_score = null;
         $copy->away_score = null;
@@ -64,8 +79,10 @@ class MatchService
         $copy->source_verified_at = null;
         $copy->source_hash = null;
         $copy->save();
+        $this->slugs->assign($copy);
         $copy->channels()->sync($match->channels->pluck('id')->all());
         $this->audit->record($actor, 'match.duplicated', $copy, ['from' => $match->id]);
+        $this->content->forgetHome();
 
         return $copy->fresh(['competition', 'homeTeam', 'awayTeam', 'channels.streamSources']);
     }
@@ -74,10 +91,15 @@ class MatchService
     {
         $match->delete();
         $this->audit->record($actor, 'match.archived', $match);
+        $this->content->forgetHome();
     }
 
     public function bulk(array $ids, string $action, ?User $actor, array $options = []): int
     {
+        if ($action === 'delete' && ! (bool) ($options['confirm_delete'] ?? false)) {
+            throw ValidationException::withMessages(['confirm_delete' => ['Delete confirmation is required.']]);
+        }
+
         $matches = GameMatch::query()->whereIn('id', $ids)->get();
 
         foreach ($matches as $match) {
@@ -95,14 +117,13 @@ class MatchService
         }
 
         $this->audit->record($actor, 'matches.bulk_'.$action, null, ['count' => $matches->count(), 'options' => $options]);
+        $this->content->forgetHome();
 
         return $matches->count();
     }
 
     private function payload(array $data, ?GameMatch $existing = null): array
     {
-        $homeName = $data['home_team_name'] ?? $existing?->homeTeam?->name ?? 'home';
-        $awayName = $data['away_team_name'] ?? $existing?->awayTeam?->name ?? 'away';
         $timezone = (string) config('rifitv.display_timezone', 'Africa/Casablanca');
         $kickoff = isset($data['kickoff_at']) ? Carbon::parse($data['kickoff_at'], $timezone) : $existing?->kickoff_at;
         $published = (bool) ($data['published'] ?? (bool) $existing?->published_at);
@@ -142,7 +163,7 @@ class MatchService
             'seo_title' => $data['seo_title'] ?? $existing?->seo_title,
             'seo_description' => $data['seo_description'] ?? $existing?->seo_description,
             'notes' => $data['notes'] ?? $existing?->notes,
-            'slug' => $data['slug'] ?? $existing?->slug ?? $this->uniqueSlug($homeName.' vs '.$awayName),
+            'slug' => $existing?->slug,
         ];
     }
 
@@ -155,25 +176,14 @@ class MatchService
         $match->channels()->sync($sync);
     }
 
-    private function setFeatured(GameMatch $match, bool $featured): bool
+    public function setFeatured(GameMatch $match, bool $featured): GameMatch
     {
         $manualOverrides = $match->manual_overrides ?? [];
         data_set($manualOverrides, 'featured', true);
 
-        return $match->update(['featured' => $featured, 'manual_overrides' => $manualOverrides]);
-    }
+        $match->update(['featured' => $featured, 'manual_overrides' => $manualOverrides]);
+        $this->content->forgetHome();
 
-    private function uniqueSlug(string $base): string
-    {
-        $slug = Str::slug($base);
-        $candidate = $slug;
-        $counter = 2;
-
-        while (GameMatch::query()->where('slug', $candidate)->exists()) {
-            $candidate = "{$slug}-{$counter}";
-            $counter++;
-        }
-
-        return $candidate;
+        return $match->fresh(['competition', 'homeTeam', 'awayTeam', 'channels.streamSources']);
     }
 }

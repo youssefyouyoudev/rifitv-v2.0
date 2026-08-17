@@ -123,6 +123,37 @@ it('applies bulk verification and status changes without implicit feature change
     expect(GameMatch::query()->whereIn('id', $matches->pluck('id'))->where('status', MatchStatus::Postponed)->count())->toBe(2);
 });
 
+it('requires explicit confirmation before bulk archiving matches', function (): void {
+    Sanctum::actingAs(ownerUser());
+    $matches = GameMatch::factory()->count(2)->create();
+
+    $this->postJson('/api/v1/admin/matches/bulk', [
+        'ids' => $matches->pluck('id')->all(),
+        'action' => 'delete',
+    ])->assertUnprocessable()->assertJsonValidationErrors('confirm_delete');
+
+    expect(GameMatch::withTrashed()->whereIn('id', $matches->pluck('id'))->whereNull('deleted_at')->count())->toBe(2);
+
+    $this->postJson('/api/v1/admin/matches/bulk', [
+        'ids' => $matches->pluck('id')->all(),
+        'action' => 'delete',
+        'confirm_delete' => true,
+    ])->assertOk()->assertJsonPath('data.updated', 2);
+
+    expect(GameMatch::withTrashed()->whereIn('id', $matches->pluck('id'))->whereNotNull('deleted_at')->count())->toBe(2);
+});
+
+it('persists a manual feature choice across future fixture syncs', function (): void {
+    Sanctum::actingAs(ownerUser());
+    $match = GameMatch::factory()->create(['featured' => false, 'manual_overrides' => null]);
+
+    $this->patchJson("/api/v1/admin/matches/{$match->id}/control/feature", ['featured' => true])
+        ->assertOk()
+        ->assertJsonPath('data.match.featured', true);
+
+    expect($match->fresh()->hasManualOverride('featured'))->toBeTrue();
+});
+
 it('updates live score and prevents invalid status transitions without override', function (): void {
     Sanctum::actingAs(ownerUser());
     $match = GameMatch::factory()->create(['status' => MatchStatus::Scheduled]);

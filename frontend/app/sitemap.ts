@@ -1,12 +1,15 @@
 import type { MetadataRoute } from "next";
-import { getCompetitions, getMatches } from "@/lib/api";
+import { getAllMatchesForSitemap, getCompetitions } from "@/lib/api";
+import { addDays, localTodayDate } from "@/lib/footballDate";
 import { absoluteUrl } from "@/lib/site";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [matches, competitions] = await Promise.all([
-    getMatches().catch(() => []),
+    getAllMatchesForSitemap().catch(() => []),
     getCompetitions().catch(() => []),
   ]);
+  const today = localTodayDate();
+  const tomorrow = addDays(today, 1);
   const teams = new Map<string, { slug: string; updatedAt?: string | null }>();
   matches.forEach((match) => {
     teams.set(match.home_team.slug, { slug: match.home_team.slug, updatedAt: match.updated_at });
@@ -16,6 +19,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     { url: absoluteUrl("/"), changeFrequency: "hourly", priority: 1 },
     { url: absoluteUrl("/matches"), changeFrequency: "hourly", priority: 0.8 },
+    { url: absoluteUrl("/matches/today"), lastModified: new Date(`${today}T12:00:00Z`), changeFrequency: "hourly", priority: 0.9 },
+    { url: absoluteUrl("/matches/tomorrow"), lastModified: new Date(`${tomorrow}T12:00:00Z`), changeFrequency: "hourly", priority: 0.8 },
     { url: absoluteUrl("/competitions"), changeFrequency: "daily", priority: 0.7 },
     ...competitions.map((competition) => ({
       url: absoluteUrl(`/competition/${competition.slug}`),

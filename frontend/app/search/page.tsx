@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { AppShell } from "@/components/AppShell";
 import { MatchSection } from "@/components/MatchSection";
+import { SearchForm } from "@/components/SearchForm";
 import { searchPublic } from "@/lib/api";
 import { absoluteUrl } from "@/lib/site";
 
@@ -27,17 +28,7 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
           <h1 className="text-2xl font-bold text-[var(--foreground)]">Search RiFiTV</h1>
           <p className="mt-2 text-sm text-[var(--muted)]">Find teams, matches and supported competitions.</p>
         </div>
-        <form action="/search" className="flex max-w-2xl gap-2">
-          <input
-            name="q"
-            defaultValue={query}
-            minLength={2}
-            maxLength={80}
-            className="min-h-11 flex-1 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 text-[var(--foreground)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
-            placeholder="Search Arsenal, La Liga..."
-          />
-          <button className="min-h-11 rounded-md bg-[var(--brand-blue)] px-4 font-semibold text-white">Search</button>
-        </form>
+        <SearchForm query={query} />
         {query.length > 0 && query.length < 2 ? <p className="text-sm text-[var(--muted)]">Type at least two characters.</p> : null}
         {results ? (
           <div className="space-y-8">

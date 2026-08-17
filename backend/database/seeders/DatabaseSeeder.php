@@ -16,7 +16,7 @@ class DatabaseSeeder extends Seeder
             ['Editor', 'editor', ['admin.search', 'matches.manage', 'scores.manage', 'teams.manage', 'competitions.manage']],
             ['Stream Manager', 'stream-manager', ['admin.search', 'streams.manage']],
             ['Content Manager', 'content-manager', ['admin.search', 'content.manage', 'settings.manage']],
-            ['Operations Manager', 'operations-manager', ['admin.search', 'automation.manage', 'alerts.view', 'audit.view', 'health.view', 'sync.view', 'streams.manage']],
+            ['Operations Manager', 'operations-manager', ['admin.search', 'analytics.view', 'automation.manage', 'alerts.view', 'audit.view', 'health.view', 'sync.view', 'streams.manage']],
         ])->mapWithKeys(fn (array $row): array => [
             $row[1] => Role::query()->updateOrCreate(['slug' => $row[1]], [
                 'name' => $row[0],

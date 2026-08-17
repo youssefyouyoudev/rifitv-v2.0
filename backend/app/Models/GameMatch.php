@@ -58,6 +58,7 @@ class GameMatch extends Model
         'seo_description',
         'notes',
         'slug',
+        'legacy_slugs',
     ];
 
     protected function casts(): array
@@ -79,6 +80,7 @@ class GameMatch extends Model
             'visibility' => MatchVisibility::class,
             'manual_overrides' => 'array',
             'source_matchday' => 'integer',
+            'legacy_slugs' => 'array',
         ];
     }
 
@@ -131,6 +133,13 @@ class GameMatch extends Model
             ->whereNotNull('published_at')
             ->where('visibility', MatchVisibility::Public)
             ->whereIn('verification_status', ['verified', 'manual_verified']);
+    }
+
+    public function scopeSlugOrLegacy(Builder $query, string $slug): Builder
+    {
+        return $query->where(function (Builder $slugQuery) use ($slug): void {
+            $slugQuery->where('slug', $slug)->orWhereJsonContains('legacy_slugs', $slug);
+        });
     }
 
     public function scopeOnLocalDate(Builder $query, string $date, ?string $timezone = null): Builder
