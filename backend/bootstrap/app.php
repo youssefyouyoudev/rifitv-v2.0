@@ -24,9 +24,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Public analytics endpoint: do not require CSRF.
         // Keep this exemption limited to this exact endpoint.
-        $middleware->validateCsrfTokens(except: [
-            'api/v1/analytics/events',
-        ]);
+       $middleware->validateCsrfTokens(except: [
+    'api/v1/analytics/events',
+    'api/v1/playback/events',
+]);
 
         $middleware->api(prepend: [
             AddSecurityHeaders::class,
