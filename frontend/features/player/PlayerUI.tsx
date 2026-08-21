@@ -203,7 +203,7 @@ type IOSVideoElement = HTMLVideoElement & {
   webkitEnterFullscreen?: () => void;
 };
 
-async function reportPlaybackEvent(eventType: string, matchSlug: string, sourceId: number | null): Promise<void> {
+export async function reportPlaybackEvent(eventType: string, matchSlug: string, sourceId: number | null): Promise<void> {
   await fetch(`${API_BASE}/playback/events`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },

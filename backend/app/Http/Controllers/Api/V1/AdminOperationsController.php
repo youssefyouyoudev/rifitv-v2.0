@@ -8,7 +8,6 @@ use App\Http\Resources\MatchResource;
 use App\Http\Resources\OperationalAlertResource;
 use App\Http\Resources\StreamSourceResource;
 use App\Http\Resources\SyncRunResource;
-use App\Jobs\CheckStreamHealthJob;
 use App\Jobs\RefreshHomepageCacheJob;
 use App\Jobs\SyncFixturesJob;
 use App\Jobs\SyncResultsJob;
@@ -19,6 +18,7 @@ use App\Models\StreamHealthCheck;
 use App\Models\StreamSource;
 use App\Models\SyncRun;
 use App\Services\MatchDateWindowService;
+use App\Services\StreamHealthService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -88,7 +88,7 @@ class AdminOperationsController extends Controller
         ]]);
     }
 
-    public function run(Request $request)
+    public function run(Request $request, StreamHealthService $streamHealth)
     {
         abort_unless($request->user()?->hasPermission('automation.manage'), 403);
         $validated = $request->validate(['action' => ['required', 'in:sync_fixtures,sync_results,check_streams,refresh_homepage']]);
@@ -96,7 +96,7 @@ class AdminOperationsController extends Controller
         match ($validated['action']) {
             'sync_fixtures' => SyncFixturesJob::dispatch(),
             'sync_results' => SyncResultsJob::dispatch(),
-            'check_streams' => CheckStreamHealthJob::dispatch(),
+            'check_streams' => $streamHealth->dispatchEnabledChecks(onlyDue: false),
             'refresh_homepage' => RefreshHomepageCacheJob::dispatch(),
         };
 

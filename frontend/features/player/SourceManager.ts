@@ -1,7 +1,7 @@
 import type { PlaybackSource, StreamProtocol } from "@/lib/types";
 
 export class SourceManager {
-  private readonly failures = new Map<number, number>();
+  private readonly failures = new Map<number, { count: number; cooldownUntil: number }>();
   private readonly manualSourceId: number | null = null;
 
   constructor(
@@ -40,14 +40,18 @@ export class SourceManager {
     return ordered.find((source) => !this.hasExhausted(source.id)) ?? null;
   }
 
-  nextAfter(currentId: number): PlaybackSource | null {
-    this.markFailed(currentId);
+  nextAfter(currentId: number, cooldownMs = 0): PlaybackSource | null {
+    this.markFailed(currentId, cooldownMs);
 
     return this.select(this.manualSourceId);
   }
 
-  markFailed(sourceId: number): void {
-    this.failures.set(sourceId, (this.failures.get(sourceId) ?? 0) + 1);
+  markFailed(sourceId: number, cooldownMs = 0): void {
+    const current = this.failures.get(sourceId);
+    this.failures.set(sourceId, {
+      count: (current?.count ?? 0) + 1,
+      cooldownUntil: cooldownMs > 0 ? Date.now() + cooldownMs : (current?.cooldownUntil ?? 0),
+    });
   }
 
   reset(sourceId: number): void {
@@ -55,7 +59,18 @@ export class SourceManager {
   }
 
   hasExhausted(sourceId: number): boolean {
-    return (this.failures.get(sourceId) ?? 0) >= this.maxFailuresPerSource;
+    const failure = this.failures.get(sourceId);
+    if (!failure) {
+      return false;
+    }
+
+    if (failure.cooldownUntil > 0 && failure.cooldownUntil <= Date.now()) {
+      this.failures.delete(sourceId);
+
+      return false;
+    }
+
+    return failure.count >= this.maxFailuresPerSource;
   }
 }
 

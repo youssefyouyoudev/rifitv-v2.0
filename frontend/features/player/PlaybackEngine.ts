@@ -156,6 +156,8 @@ export class PlaybackEngine {
         if (!this.isActive(generation, adapter)) return;
         this.metrics.emit({ name: "playback_started", source });
         this.metrics.emit({ name: "startup_duration", source, durationMs: performance.now() - this.startupStartedAt });
+        this.recovery.reset(source.id);
+        this.sourceManager?.reset(source.id);
         this.setState("playing");
       },
       onBuffering: () => {
@@ -229,7 +231,7 @@ export class PlaybackEngine {
     }
 
     if (decision.action === "switch_source") {
-      const next = source && this.sourceManager?.nextAfter(source.id);
+      const next = source && this.sourceManager?.nextAfter(source.id, decision.cooldownMs);
       if (next) {
         await this.loadSource(next, "switching_source");
         return;

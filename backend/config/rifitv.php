@@ -12,6 +12,7 @@ return [
     'playback_duration_minutes' => (int) env('PLAYBACK_DURATION_MINUTES', 120),
     'stream_health' => [
         'timeout' => (int) env('STREAM_HEALTH_TIMEOUT', 5),
+        'dispatch_limit' => (int) env('STREAM_HEALTH_DISPATCH_LIMIT', 300),
         'failure_threshold' => (int) env('STREAM_HEALTH_FAILURE_THRESHOLD', 3),
         'recovery_threshold' => (int) env('STREAM_HEALTH_RECOVERY_THRESHOLD', 2),
         'history_retention_days' => (int) env('STREAM_HEALTH_HISTORY_RETENTION_DAYS', 7),

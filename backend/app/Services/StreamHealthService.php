@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\StreamHealth;
 use App\Enums\StreamProtocol;
+use App\Jobs\CheckStreamHealthJob;
 use App\Models\StreamHealthCheck;
 use App\Models\StreamSource;
 use Illuminate\Support\Facades\Cache;
@@ -16,7 +17,7 @@ class StreamHealthService
 
     public function check(StreamSource $source): array
     {
-        return Cache::lock('rifitv:stream-health:'.$source->id, 60)->block(1, function () use ($source): array {
+        return Cache::lock('rifitv:stream-health:'.$source->id, 30)->block(1, function () use ($source): array {
             if (! $source->enabled) {
                 return $this->record($source, StreamHealth::Disabled, null, 'disabled');
             }
@@ -29,7 +30,9 @@ class StreamHealthService
             }
 
             try {
-                $response = Http::timeout((int) config('rifitv.stream_health.timeout', 5))
+                $timeout = max(1, min(10, (int) config('rifitv.stream_health.timeout', 5)));
+                $response = Http::timeout($timeout)
+                    ->connectTimeout(min(3, $timeout))
                     ->withOptions(['allow_redirects' => ['max' => 4], 'proxy' => ''])
                     ->withHeaders([
                         'Accept' => '*/*',
@@ -62,10 +65,43 @@ class StreamHealthService
 
     public function checkAll(): int
     {
+        return $this->dispatchEnabledChecks(onlyDue: false);
+    }
+
+    public function dispatchDueChecks(?int $limit = null): int
+    {
+        return $this->dispatchEnabledChecks(onlyDue: true, limit: $limit);
+    }
+
+    public function dispatchEnabledChecks(bool $onlyDue = true, ?int $limit = null): int
+    {
         $count = 0;
-        StreamSource::query()->where('enabled', true)->each(function (StreamSource $source) use (&$count): void {
-            $this->check($source);
-            $count++;
+        $max = $limit ?? (int) config('rifitv.stream_health.dispatch_limit', 300);
+        $query = StreamSource::query()
+            ->where('enabled', true)
+            ->select('id')
+            ->orderBy('id');
+
+        if ($onlyDue) {
+            $query->where(function ($query): void {
+                $query
+                    ->whereNull('last_checked_at')
+                    ->orWhere('last_checked_at', '<=', now()->subMinutes(5));
+            });
+        }
+
+        $query->chunkById(100, function ($sources) use (&$count, $max): bool {
+            foreach ($sources as $source) {
+                if ($count >= $max) {
+                    return false;
+                }
+
+                CheckStreamHealthJob::dispatch($source->id)
+                    ->delay(now()->addSeconds((int) floor($count / 20) * 5));
+                $count++;
+            }
+
+            return $count < $max;
         });
 
         return $count;

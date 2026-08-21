@@ -51,7 +51,18 @@ class PlaybackIngestLifecycleService
         LiveIngest::query()
             ->whereNotIn('stream_source_id', $activeSourceIds->unique()->all())
             ->whereNotIn('status', ['stopped', 'failed'])
+            ->with('streamSource')
             ->each(function (LiveIngest $ingest) use (&$stopped): void {
+                if (! $ingest->streamSource) {
+                    $ingest->update([
+                        'status' => 'stopped',
+                        'pid' => null,
+                        'last_error' => 'missing_stream_source',
+                    ]);
+
+                    return;
+                }
+
                 $this->relay->stop($ingest->streamSource);
                 $stopped++;
             });

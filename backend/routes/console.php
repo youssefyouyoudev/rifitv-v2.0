@@ -7,6 +7,7 @@ use App\Jobs\ImportPlaylistJob;
 use App\Jobs\RefreshHomepageCacheJob;
 use App\Jobs\SyncFixturesJob;
 use App\Jobs\SyncResultsJob;
+use App\Models\LiveIngest;
 use App\Models\Playlist;
 use App\Models\Role;
 use App\Models\StreamSource;
@@ -18,6 +19,7 @@ use App\Services\IptvCatalogResetService;
 use App\Services\IptvDiagnosticService;
 use App\Services\OfficialFixtureImportService;
 use App\Services\PlaybackIngestLifecycleService;
+use App\Services\StreamHealthService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
@@ -188,8 +190,15 @@ Artisan::command('rifitv:reset-season-data {season=2026-27} {--dry-run} {--force
 })->purpose('Reset production football/content/live-ops data while preserving users and roles');
 
 Artisan::command('rifitv:check-streams {sourceId?}', function (?int $sourceId = null) {
-    CheckStreamHealthJob::dispatch($sourceId);
-    $this->info('Stream health check queued.');
+    if ($sourceId) {
+        CheckStreamHealthJob::dispatch($sourceId);
+        $this->info('Stream health check queued for source '.$sourceId.'.');
+
+        return;
+    }
+
+    $count = app(StreamHealthService::class)->dispatchEnabledChecks(onlyDue: false);
+    $this->info("Queued {$count} stream health checks.");
 });
 
 Artisan::command('rifitv:relay:start {sourceId}', function (HlsRelayManager $relay) {
@@ -234,6 +243,60 @@ Artisan::command('rifitv:relay:stop {sourceId}', function (HlsRelayManager $rela
         'status' => $ingest->status,
         'provider_url_hidden' => true,
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+});
+
+Artisan::command('rifitv:relay:reset-stale {--dry-run} {--force}', function (HlsRelayManager $relay) {
+    $dryRun = (bool) $this->option('dry-run');
+
+    if (app()->environment('production') && ! $dryRun && ! $this->option('force')) {
+        $this->error('Production stale relay reset requires --force after reviewing --dry-run.');
+
+        return 1;
+    }
+
+    $reset = [];
+    $kept = [];
+
+    LiveIngest::query()
+        ->with('streamSource')
+        ->orderBy('id')
+        ->each(function (LiveIngest $ingest) use ($relay, $dryRun, &$reset, &$kept): void {
+            $checked = $relay->refreshHealth($ingest);
+            $stale = in_array($checked->status, ['failed', 'degraded', 'stopped'], true) || ! $checked->pid;
+
+            if (! $stale) {
+                $kept[] = [
+                    'id' => $checked->id,
+                    'source_id' => $checked->stream_source_id,
+                    'status' => $checked->status,
+                    'pid' => $checked->pid,
+                ];
+
+                return;
+            }
+
+            $reset[] = [
+                'id' => $checked->id,
+                'source_id' => $checked->stream_source_id,
+                'status' => $checked->status,
+                'pid' => $checked->pid,
+                'output_path' => $checked->output_path,
+            ];
+
+            if (! $dryRun) {
+                $relay->resetStale($checked);
+            }
+        });
+
+    $this->line(json_encode([
+        'dry_run' => $dryRun,
+        'reset_count' => count($reset),
+        'kept_active_count' => count($kept),
+        'reset' => $reset,
+        'kept_active' => $kept,
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+    return 0;
 });
 
 Artisan::command('rifitv:relay:lifecycle', function (PlaybackIngestLifecycleService $lifecycle) {
@@ -407,7 +470,13 @@ Artisan::command('rifitv:production-check', function (FootballProductionAuditSer
 Schedule::call(fn () => Cache::put('rifitv:scheduler:last_seen_at', now()->toIso8601String(), 3600))->everyMinute();
 Schedule::job(new SyncFixturesJob)->everyFourHours()->when(fn () => (bool) config('rifitv.fixture_sync_enabled', true));
 Schedule::job(new SyncResultsJob)->everyTwoMinutes()->when(fn () => (bool) config('rifitv.result_sync_enabled', true));
-Schedule::job(new CheckStreamHealthJob)->everyFiveMinutes()->when(fn () => (bool) config('rifitv.stream_health_enabled', true));
+Schedule::call(function (): void {
+    app(StreamHealthService::class)->dispatchDueChecks();
+})
+    ->name('rifitv:dispatch-stream-health-checks')
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->when(fn () => (bool) config('rifitv.stream_health_enabled', true));
 Schedule::command('rifitv:relay:lifecycle')->everyMinute()->when(fn () => (bool) config('rifitv.stable_relay.enabled', true));
 Schedule::call(function (): void {
     Playlist::query()

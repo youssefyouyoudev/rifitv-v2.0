@@ -4,7 +4,7 @@ import type { PlaybackIssue } from "./types";
 export type RecoveryDecision =
   | { action: "retry_current"; attempt: number; delayMs: number }
   | { action: "recover_media"; attempt: number }
-  | { action: "switch_source"; reason: string }
+  | { action: "switch_source"; reason: string; cooldownMs: number }
   | { action: "fail"; reason: string };
 
 export class RecoveryManager {
@@ -13,6 +13,7 @@ export class RecoveryManager {
   constructor(
     private readonly maxAttemptsPerSource: number,
     private readonly retryBackoffMs: number[],
+    private readonly networkCooldownMs = 45_000,
   ) {}
 
   decide(source: PlaybackSource | null, issue: PlaybackIssue): RecoveryDecision {
@@ -23,8 +24,10 @@ export class RecoveryManager {
     const nextAttempt = (this.attempts.get(source.id) ?? 0) + 1;
     this.attempts.set(source.id, nextAttempt);
 
-    if (nextAttempt > this.maxAttemptsPerSource) {
-      return { action: "switch_source", reason: issue.message };
+    const maxAttempts = issue.kind === "network" ? 1 : this.maxAttemptsPerSource;
+
+    if (nextAttempt > maxAttempts) {
+      return { action: "switch_source", reason: issue.message, cooldownMs: this.networkCooldownMs };
     }
 
     if (issue.kind === "media" && nextAttempt <= 2) {

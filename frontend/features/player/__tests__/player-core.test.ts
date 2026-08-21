@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { RecoveryManager } from "../RecoveryManager";
 import { SourceManager } from "../SourceManager";
 import { PlaybackStateMachine } from "../PlaybackStateMachine";
 import { DEFAULT_MPEGTS_PROFILE, MPEGTS_PROFILES } from "../config";
+import { reportPlaybackEvent } from "../PlayerUI";
 import type { PlaybackSource } from "@/lib/types";
 
 const sources: PlaybackSource[] = [
@@ -55,9 +56,38 @@ describe("player core", () => {
     const recovery = new RecoveryManager(2, [100, 200]);
     const source = sources[1];
 
-    expect(recovery.decide(source, { kind: "network", fatal: true, message: "fail" }).action).toBe("retry_current");
-    expect(recovery.decide(source, { kind: "network", fatal: true, message: "fail" }).action).toBe("retry_current");
-    expect(recovery.decide(source, { kind: "network", fatal: true, message: "fail" }).action).toBe("switch_source");
+    expect(recovery.decide(source, { kind: "media", fatal: true, message: "fail" }).action).toBe("recover_media");
+    expect(recovery.decide(source, { kind: "media", fatal: true, message: "fail" }).action).toBe("recover_media");
+    expect(recovery.decide(source, { kind: "media", fatal: true, message: "fail" }).action).toBe("switch_source");
+  });
+
+  it("limits network transport failures to one retry before source cooldown", () => {
+    const recovery = new RecoveryManager(3, [100, 200], 45_000);
+    const source = sources[1];
+
+    expect(recovery.decide(source, { kind: "network", fatal: true, message: "HTTP 502" }).action).toBe("retry_current");
+    expect(recovery.decide(source, { kind: "network", fatal: true, message: "HTTP 502" })).toMatchObject({
+      action: "switch_source",
+      cooldownMs: 45_000,
+    });
+  });
+
+  it("temporarily cools a failed source instead of retrying it in a storm", () => {
+    const manager = new SourceManager(sources, new Set(["hls"]), 1);
+    manager.markFailed(2, 45_000);
+
+    expect(manager.select()?.id).toBe(1);
+  });
+
+  it("does not retry deterministic playback telemetry errors", async () => {
+    const originalFetch = globalThis.fetch;
+    const fetchMock = vi.fn().mockResolvedValue(new Response("expired", { status: 419 }));
+    globalThis.fetch = fetchMock;
+
+    await reportPlaybackEvent("recovery_failed", "match", 1);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    globalThis.fetch = originalFetch;
   });
 
   it("uses a stability-first raw MPEG-TS profile", () => {

@@ -11,19 +11,21 @@ class CheckStreamHealthJob implements ShouldQueue
 {
     use Queueable;
 
-    public function __construct(public ?int $sourceId = null) {}
+    public int $tries = 1;
+
+    public int $timeout = 15;
+
+    public bool $failOnTimeout = true;
+
+    public function __construct(public int $sourceId) {}
 
     public function handle(StreamHealthService $service): void
     {
-        if ($this->sourceId) {
-            $source = StreamSource::query()->find($this->sourceId);
-            if ($source) {
-                $service->check($source);
-            }
-
+        $source = StreamSource::query()->find($this->sourceId);
+        if (! $source || ! $source->enabled) {
             return;
         }
 
-        $service->checkAll();
+        $service->check($source);
     }
 }
