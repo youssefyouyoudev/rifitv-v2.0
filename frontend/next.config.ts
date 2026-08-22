@@ -5,6 +5,7 @@ const apiBase =
   "http://127.0.0.1:8000/api/v1";
 
 const apiOrigin = new URL(apiBase).origin;
+const distDir = process.env.NEXT_DIST_DIR || ".next";
 
 // ---------------------------------------------------------------------------
 // Ad provider domains — only the exact domains used by our ad codes
@@ -67,6 +68,8 @@ const cspHeader = `
   .trim();
 
 const nextConfig: NextConfig = {
+  distDir,
+
   allowedDevOrigins: ["127.0.0.1"],
 
   turbopack: {

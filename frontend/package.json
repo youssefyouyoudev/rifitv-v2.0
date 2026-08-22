@@ -10,6 +10,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "smoke:assets": "node scripts/smoke-next-assets.mjs",
     "validate:football-assets": "node scripts/validate-football-assets.mjs",
     "e2e": "playwright test"
   },

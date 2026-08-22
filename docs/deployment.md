@@ -13,7 +13,7 @@ sudo apt install -y php8.3-fpm php8.3-cli php8.3-mysql php8.3-mbstring php8.3-xm
 sudo apt install -y ffmpeg
 ```
 
-Install Composer and Node.js 22 from trusted upstream sources. Do not run production as `root`.
+Install Composer, Node.js 22, and PM2 from trusted upstream sources. Do not run production as `root`.
 
 ## Repository
 
@@ -71,11 +71,13 @@ npm ci
 npm run build
 ```
 
-Install examples from `infra/systemd/` into `/etc/systemd/system/`, then:
+Install examples from `infra/systemd/` into `/etc/systemd/system/` for Laravel queue/scheduler services. Run the Next.js frontend with PM2 from `ecosystem.config.cjs`, which pins the process cwd to `/var/www/rifitv-v2.0/frontend`:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now rifitv-next rifitv-queue rifitv-scheduler
+sudo systemctl enable --now rifitv-queue rifitv-scheduler
+pm2 start /var/www/rifitv-v2.0/ecosystem.config.cjs --only rifitv-frontend --update-env
+pm2 save
 ```
 
 Run the dedicated stream gateway as its own Node service behind Nginx. Configure it with:
@@ -104,7 +106,7 @@ sudo systemctl reload nginx
 
 ## Repeatable Deploy
 
-Use `scripts/deploy.sh`. It pulls with `--ff-only`, installs dependencies, runs non-destructive migrations, builds Next.js before restart, restarts workers/services, and checks `/api/health`.
+Use `scripts/deploy.sh`. It pulls with `--ff-only`, installs dependencies, runs non-destructive migrations, builds Next.js into `.next-deploy` while the old PM2 process keeps serving the existing `.next`, stops PM2, swaps the completed build into `.next`, restarts PM2 from `/var/www/rifitv-v2.0/frontend`, smoke-tests referenced JS/CSS chunks from `/` and `/admin`, restarts workers/services, and checks `/api/health`.
 
 ## Cloudflare
 
