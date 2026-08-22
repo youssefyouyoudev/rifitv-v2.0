@@ -161,19 +161,20 @@ export async function getMatches(status?: string, competition?: string, date?: s
   return [firstPage, ...remainingPages].flatMap((page) => page.data);
 }
 
-export async function getAllMatchesForSitemap(): Promise<Match[]> {
+export async function getAllMatchesForSitemap(limit = 500): Promise<Match[]> {
   const firstPage = await getMatchesPage();
   const lastPage = firstPage.meta?.last_page ?? 1;
+  const maxPages = Math.max(1, Math.ceil(limit / 50));
 
-  if (lastPage <= 1) {
-    return firstPage.data;
+  if (lastPage <= 1 || maxPages <= 1) {
+    return firstPage.data.slice(0, limit);
   }
 
   const remainingPages = await Promise.all(
-    Array.from({ length: lastPage - 1 }, (_, index) => getMatchesPage(undefined, undefined, undefined, undefined, undefined, index + 2)),
+    Array.from({ length: Math.min(lastPage, maxPages) - 1 }, (_, index) => getMatchesPage(undefined, undefined, undefined, undefined, undefined, index + 2)),
   );
 
-  return [firstPage, ...remainingPages].flatMap((page) => page.data);
+  return [firstPage, ...remainingPages].flatMap((page) => page.data).slice(0, limit);
 }
 
 export async function getMatch(slug: string, signal?: AbortSignal): Promise<Match> {

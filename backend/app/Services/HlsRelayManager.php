@@ -143,11 +143,15 @@ class HlsRelayManager
 
         $stallSeconds = (int) config('rifitv.stable_relay.stall_seconds', 8);
         $readySegments = (int) config('rifitv.stable_relay.ready_segments', 3);
+        $startupTimeout = (int) config('rifitv.stable_relay.startup_timeout_seconds', 20);
 
         $segmentsFresh = $lastSegmentAt
             && $lastSegmentAt >= now()->subSeconds($stallSeconds)->timestamp;
 
         $processAlive = $this->processAlive($ingest->pid);
+        $startupExpired = $ingest->status === 'starting'
+            && $ingest->process_started_at
+            && $ingest->process_started_at->lt(now()->subSeconds($startupTimeout));
 
         $updates = [
             'segment_count' => count($segments),
@@ -165,6 +169,9 @@ class HlsRelayManager
             $updates['status'] = 'ready';
             $updates['ready_at'] = $ingest->ready_at ?? now();
             $updates['last_error'] = null;
+        } elseif ($processAlive && $startupExpired && ! $segmentsFresh) {
+            $updates['status'] = 'degraded';
+            $updates['last_error'] = 'startup_timeout';
         } elseif (
             in_array($ingest->status, ['starting', 'ready', 'reconnecting'], true)
             && ! $processAlive
@@ -268,7 +275,7 @@ class HlsRelayManager
             '-reconnect_on_http_error',
             '5xx',
             '-reconnect_delay_max',
-            '2',
+            '5',
             '-i',
             $source->url,
             '-map',
@@ -286,7 +293,9 @@ class HlsRelayManager
             '-hls_delete_threshold',
             $deleteThreshold,
             '-hls_flags',
-            'delete_segments+append_list+omit_endlist+temp_file',
+            'delete_segments+omit_endlist+temp_file',
+            '-hls_segment_filename',
+            $ingest->output_path.DIRECTORY_SEPARATOR.'segment-%06d.ts',
             $ingest->output_path.DIRECTORY_SEPARATOR.'index.m3u8',
         ];
     }

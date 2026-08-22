@@ -69,7 +69,7 @@ class PlaybackSourceSelector
             'default_source_id' => $sources->first()?->id,
             'sources' => $sources->map(fn (StreamSource $source): array => $this->sourcePayload($match, $source))->all(),
             'policy' => [
-                'max_recovery_attempts_per_source' => 3,
+                'max_recovery_attempts_per_source' => 2,
                 'max_source_failures_per_session' => 1,
                 'stall_detection_ms' => 8000,
                 'retry_backoff_ms' => [1000, 2500, 5000],

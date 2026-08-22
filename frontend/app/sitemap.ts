@@ -5,13 +5,13 @@ import { absoluteUrl } from "@/lib/site";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [matches, competitions] = await Promise.all([
-    getAllMatchesForSitemap().catch(() => []),
+    getAllMatchesForSitemap(500).catch(() => []),
     getCompetitions().catch(() => []),
   ]);
   const today = await getHome().then((home) => home.date).catch(() => localTodayDate());
   const tomorrow = addDays(today, 1);
   const teams = new Map<string, { slug: string; updatedAt?: string | null }>();
-  matches.forEach((match) => {
+  matches.filter((match) => match.slug).forEach((match) => {
     teams.set(match.home_team.slug, { slug: match.home_team.slug, updatedAt: match.updated_at });
     teams.set(match.away_team.slug, { slug: match.away_team.slug, updatedAt: match.updated_at });
   });
@@ -27,7 +27,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "daily" as const,
       priority: 0.7,
     })),
-    ...matches.map((match) => ({
+    ...matches.filter((match) => match.slug).map((match) => ({
       url: absoluteUrl(`/match/${match.slug}`),
       lastModified: new Date(match.kickoff_at ?? `${match.scheduled_date ?? new Date().toISOString().slice(0, 10)}T12:00:00Z`),
       changeFrequency: match.status === "live" ? ("always" as const) : ("daily" as const),

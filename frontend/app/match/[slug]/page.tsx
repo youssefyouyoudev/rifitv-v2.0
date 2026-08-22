@@ -22,16 +22,17 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata({ params }: PageProps<"/match/[slug]">): Promise<Metadata> {
   const { slug } = await params;
   const match = await getMatch(slug);
-  const title = `${match.home_team.name} vs ${match.away_team.name} - TV Channel & Kickoff`;
+  const title = `مباراة ${match.home_team.name} ضد ${match.away_team.name} - الموعد والقنوات الناقلة`;
   const channels = match.channels.map((channel) => channel.name).join(", ");
-  const description = `${match.home_team.name} vs ${match.away_team.name}, ${match.competition.name}: Morocco kickoff time, match status${channels ? ` and TV channels ${channels}` : " and verified broadcast information"} on RiFiTV.`;
+  const matchDate = formatMatchDateLabel(match);
+  const description = `${match.home_team.name} ضد ${match.away_team.name} في ${match.competition.name}: الموعد ${matchDate}${channels ? ` والقنوات الناقلة ${channels}` : " ومعلومات التغطية"} على RiFiTV.`;
   const url = absoluteUrl(`/match/${match.slug}`);
 
   return {
     title,
     description,
     alternates: { canonical: url },
-    openGraph: { type: "article", siteName: SITE_NAME, title, description, url },
+    openGraph: { type: "article", siteName: SITE_NAME, title, description, url, locale: "ar_MA" },
     twitter: { card: "summary_large_image", title, description },
   };
 }
@@ -55,6 +56,9 @@ export default async function MatchPage({ params }: PageProps<"/match/[slug]">) 
       { "@type": "SportsTeam", name: match.away_team.name },
     ],
     organizer: { "@type": "Organization", name: SITE_NAME, url: absoluteUrl("/") },
+    sport: "Soccer",
+    inLanguage: "ar-MA",
+    superEvent: { "@type": "SportsEvent", name: match.competition.name },
     description: `${match.competition.name} match on ${formatMatchDateLabel(match)}.`,
   };
 

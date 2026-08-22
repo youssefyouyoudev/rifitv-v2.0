@@ -314,6 +314,8 @@ function loadScriptZone(zone: AdZone, placement: string): Promise<AdLoadResult> 
     const timeout = window.setTimeout(() => {
       if (settled) return;
       settled = true;
+      registry.delete(zone.id);
+      loadedZones.delete(zone.id);
       trackEvent("ad_failed", { ad_zone: zone.id, ad_placement: placement, reason: "timeout", ad_format: zone.format });
       resolve({ loaded: false, zone, reason: "timeout" });
     }, AD_SETTINGS.scriptTimeoutMs);
@@ -330,6 +332,8 @@ function loadScriptZone(zone: AdZone, placement: string): Promise<AdLoadResult> 
       if (settled) return;
       settled = true;
       window.clearTimeout(timeout);
+      registry.delete(zone.id);
+      loadedZones.delete(zone.id);
       trackEvent("ad_failed", {
         ad_zone: zone.id,
         ad_placement: placement,

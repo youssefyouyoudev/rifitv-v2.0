@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useId } from "react";
+import { useEffect, useRef, useState } from "react";
 import { loadNativeAd } from "@/lib/ads/AdManager";
 import { AD_SETTINGS, NATIVE_AD } from "@/lib/ads/config";
 import { trackEvent } from "@/lib/analytics";
@@ -17,19 +17,13 @@ type SlotState = "idle" | "loading" | "loaded" | "failed";
 /**
  * NativeAd — renders the effectivecpmnetwork.com native ad unit.
  *
- * Creates the required container div with id=container-378e2f922f779d8fc9be67c2a26a1c4d,
- * then loads the native invoke.js into it.
- *
- * Each instance gets a unique container ID suffix to allow multiple placements
- * on long pages (max 2, controlled by the parent).
+ * Creates the provider-required container div, then loads the native invoke.js into it.
  */
 export function NativeAd({ className = "", eager = false }: Props) {
-  const uid = useId();
-  // Native ad container ID uses the provider's required prefix + unique suffix
-  const containerId = `${NATIVE_AD.containerId}${uid.replace(/:/g, "_")}`;
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const [slotState, setSlotState] = useState<SlotState>("idle");
   const loadStarted = useRef(false);
+  const containerId = NATIVE_AD.containerId;
   // Capture disabled state synchronously so we don't setState inside effect
   const isDisabled = !AD_SETTINGS.enabled || !AD_SETTINGS.normalEnabled || !NATIVE_AD.enabled;
 

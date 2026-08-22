@@ -23,22 +23,23 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   applicationName: SITE_NAME,
   title: {
-    default: "RiFiTV - Football Matches, Fixtures & Live Match Information",
+    default: "RiFiTV - مباريات اليوم وجدول القنوات الناقلة",
     template: "%s | RiFiTV",
   },
-  description: "RiFiTV tracks football fixtures, match status, scores and verified broadcast information for supported competitions and teams.",
+  description: "RiFiTV يقدم جدول مباريات كرة القدم اليوم، المواعيد بتوقيت المغرب، النتائج، والقنوات الناقلة للمنافسات والفرق المدعومة.",
   alternates: { canonical: absoluteUrl("/") },
   openGraph: {
     type: "website",
     siteName: SITE_NAME,
-    title: "RiFiTV - Football Matches, Fixtures & Live Match Information",
-    description: "Football fixtures, match status, scores and verified broadcast information for supported competitions and teams.",
+    title: "RiFiTV - مباريات اليوم وجدول القنوات الناقلة",
+    description: "جدول مباريات كرة القدم، توقيت المباريات، النتائج، ومعلومات القنوات الناقلة.",
     url: absoluteUrl("/"),
+    locale: "ar_MA",
   },
   twitter: {
     card: "summary_large_image",
-    title: "RiFiTV - Football Matches, Fixtures & Live Match Information",
-    description: "Football fixtures, match status, scores and verified broadcast information.",
+    title: "RiFiTV - مباريات اليوم وجدول القنوات الناقلة",
+    description: "مواعيد مباريات كرة القدم اليوم والقنوات الناقلة على RiFiTV.",
   },
   icons: {
     icon: [
@@ -68,17 +69,19 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     name: SITE_NAME,
     url: absoluteUrl("/"),
     logo: absoluteUrl("/brand/rifitv-icon-512.png"),
+    sameAs: [absoluteUrl("/")],
   };
   const websiteJsonLd = {
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: SITE_NAME,
     url: absoluteUrl("/"),
+    inLanguage: "ar-MA",
   };
 
   return (
     <html
-      lang="en"
+      lang="ar-MA"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
       suppressHydrationWarning
     >

@@ -102,15 +102,23 @@ class HlsAdapter implements PlaybackAdapter {
 
     this.hls = new Hls({
       liveSyncDurationCount: 3,
+      liveMaxLatencyDurationCount: 5,
       maxBufferLength: 30,
       backBufferLength: 30,
       enableWorker: true,
+      lowLatencyMode: false,
+      fragLoadingTimeOut: 15_000,
+      manifestLoadingTimeOut: 10_000,
+      levelLoadingTimeOut: 10_000,
     });
     this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
       this.events.onReady();
       this.events.onQualities(this.qualities());
     });
     this.hls.on(Hls.Events.ERROR, (_event, data) => {
+      if (!data.fatal) {
+        return;
+      }
       this.events.onIssue({
         kind: data.type?.includes("MEDIA") ? "media" : "network",
         fatal: data.fatal,

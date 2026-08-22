@@ -15,23 +15,24 @@ import type { Match } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Today's Football Matches & TV Channels in Morocco",
+  title: "مباريات اليوم بث مباشر وجدول القنوات الناقلة",
   description:
-    "See today's football matches, Morocco kickoff times, live scores and verified TV channel information for LaLiga, Premier League, Champions League and MENA fixtures.",
+    "تابع مباريات اليوم، مواعيد كرة القدم بتوقيت المغرب، جدول المباريات، النتائج، والقنوات الناقلة لأهم البطولات على RiFiTV.",
   alternates: { canonical: absoluteUrl("/") },
   openGraph: {
     type: "website",
     siteName: SITE_NAME,
-    title: "Today's Football Matches & TV Channels in Morocco | RiFiTV",
+    title: "مباريات اليوم وجدول القنوات الناقلة | RiFiTV",
     description:
-      "Today's football fixtures, Morocco kickoff times, live status and verified TV channel information.",
+      "مواعيد مباريات اليوم، حالة المباريات، والقنوات الناقلة بتوقيت المغرب.",
     url: absoluteUrl("/"),
+    locale: "ar_MA",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Today's Football Matches & TV Channels in Morocco | RiFiTV",
+    title: "مباريات اليوم وجدول القنوات الناقلة | RiFiTV",
     description:
-      "Today's football fixtures, Morocco kickoff times, live status and verified TV channel information.",
+      "جدول مباريات كرة القدم اليوم والقنوات الناقلة على RiFiTV.",
   },
 };
 

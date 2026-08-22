@@ -18,11 +18,13 @@ export class PlaybackEngine {
   private currentSource: PlaybackSource | null = null;
   private stallTimer: number | null = null;
   private retryTimer: number | null = null;
+  private stablePlaybackTimer: number | null = null;
   private lastProgressAt = Date.now();
   private lastCurrentTime = 0;
   private startupStartedAt = 0;
   private loadGeneration = 0;
   private destroyed = false;
+  private readonly stablePlaybackResetMs = 15_000;
 
   constructor(
     private readonly video: HTMLVideoElement,
@@ -122,6 +124,7 @@ export class PlaybackEngine {
     this.loadGeneration += 1;
     this.clearRetryTimer();
     this.clearStallTimer();
+    this.clearStablePlaybackTimer();
     this.adapter?.destroy();
     this.adapter = null;
     this.currentSource = null;
@@ -138,6 +141,7 @@ export class PlaybackEngine {
     const generation = ++this.loadGeneration;
     this.clearRetryTimer();
     this.clearStallTimer();
+    this.clearStablePlaybackTimer();
     const previous = this.currentSource;
     this.setState(state, state === "switching_source" ? "Switching broadcast..." : "Connecting...");
     this.adapter?.destroy();
@@ -156,8 +160,7 @@ export class PlaybackEngine {
         if (!this.isActive(generation, adapter)) return;
         this.metrics.emit({ name: "playback_started", source });
         this.metrics.emit({ name: "startup_duration", source, durationMs: performance.now() - this.startupStartedAt });
-        this.recovery.reset(source.id);
-        this.sourceManager?.reset(source.id);
+        this.scheduleStablePlaybackReset(source.id, generation);
         this.setState("playing");
       },
       onBuffering: () => {
@@ -319,6 +322,24 @@ export class PlaybackEngine {
     if (this.stallTimer !== null) {
       window.clearInterval(this.stallTimer);
       this.stallTimer = null;
+    }
+  }
+
+  private scheduleStablePlaybackReset(sourceId: number, generation: number): void {
+    this.clearStablePlaybackTimer();
+    this.stablePlaybackTimer = window.setTimeout(() => {
+      this.stablePlaybackTimer = null;
+      if (this.isCurrentGeneration(generation) && this.currentSource?.id === sourceId && this.stateMachine.state() === "playing") {
+        this.recovery.reset(sourceId);
+        this.sourceManager?.reset(sourceId);
+      }
+    }, this.stablePlaybackResetMs);
+  }
+
+  private clearStablePlaybackTimer(): void {
+    if (this.stablePlaybackTimer !== null) {
+      window.clearTimeout(this.stablePlaybackTimer);
+      this.stablePlaybackTimer = null;
     }
   }
 
