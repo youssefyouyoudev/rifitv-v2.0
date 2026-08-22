@@ -3,12 +3,14 @@
 const baseUrl = (process.env.SMOKE_BASE_URL || "http://127.0.0.1:3000").replace(/\/+$/, "");
 const pages = (process.env.SMOKE_PAGES || "/,/admin").split(",").map((page) => page.trim()).filter(Boolean);
 const longCachePattern = /(?:^|,\s*)max-age=(?:[3-9]\d{2,}|\d{4,})/i;
+const transientStatuses = new Set([502, 503, 504]);
+const retryDelaysMs = [500, 1000, 1500];
 
 const failures = [];
 
 for (const page of pages) {
   const pageUrl = new URL(page, `${baseUrl}/`);
-  const response = await fetch(pageUrl, { headers: { "Cache-Control": "no-cache" } });
+  const response = await fetchWithTransientRetry(pageUrl);
 
   if (!response.ok) {
     failures.push(`${pageUrl.href} returned HTTP ${response.status}`);
@@ -67,7 +69,7 @@ function referencedAssets(html, pageUrl) {
 }
 
 async function verifyAsset(assetUrl) {
-  const response = await fetch(assetUrl, { headers: { "Cache-Control": "no-cache" } });
+  const response = await fetchWithTransientRetry(assetUrl);
   const contentType = response.headers.get("content-type") || "";
 
   if (response.status !== 200) {
@@ -82,4 +84,32 @@ async function verifyAsset(assetUrl) {
   if (assetUrl.split("?")[0].endsWith(".css") && !/\btext\/css\b/i.test(contentType)) {
     failures.push(`${assetUrl} returned invalid CSS content-type: ${contentType || "missing"}`);
   }
+}
+
+async function fetchWithTransientRetry(url) {
+  let lastError;
+
+  for (let attempt = 0; attempt <= retryDelaysMs.length; attempt++) {
+    try {
+      const response = await fetch(url, { headers: { "Cache-Control": "no-cache" } });
+
+      if (!transientStatuses.has(response.status) || attempt === retryDelaysMs.length) {
+        return response;
+      }
+    } catch (error) {
+      lastError = error;
+
+      if (attempt === retryDelaysMs.length) {
+        throw error;
+      }
+    }
+
+    await delay(retryDelaysMs[attempt]);
+  }
+
+  throw lastError ?? new Error(`Failed to fetch ${url}`);
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

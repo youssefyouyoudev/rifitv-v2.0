@@ -7,7 +7,7 @@ module.exports = {
       args: "start",
       env: {
         NODE_ENV: "production",
-        PORT: "3000",
+        PORT: "3110",
       },
       max_memory_restart: "512M",
       time: true,

@@ -10,6 +10,7 @@ QUEUE_SERVICE="${QUEUE_SERVICE:-rifitv-queue}"
 SCHEDULER_SERVICE="${SCHEDULER_SERVICE:-rifitv-scheduler}"
 HEALTH_URL="${HEALTH_URL:-https://api.rifitv.com/api/health}"
 FRONTEND_HEALTH_URL="${FRONTEND_HEALTH_URL:-https://rifitv.com}"
+FRONTEND_READY_URL="${FRONTEND_READY_URL:-http://127.0.0.1:3110/}"
 NEXT_STAGING_DIR="${NEXT_STAGING_DIR:-.next-deploy}"
 NEXT_BACKUP_DIR="${NEXT_BACKUP_DIR:-.next-previous}"
 
@@ -33,6 +34,23 @@ rollback_frontend() {
         pm2 delete "$PM2_APP_NAME" >/dev/null 2>&1 || true
         pm2 start "$APP_DIR/ecosystem.config.cjs" --only "$PM2_APP_NAME" --update-env >/dev/null || true
     fi
+}
+
+wait_for_frontend() {
+    for attempt in $(seq 1 30); do
+        if curl --fail --silent --show-error --max-time 2 "$FRONTEND_READY_URL" >/dev/null; then
+            echo "Frontend ready at $FRONTEND_READY_URL"
+            return 0
+        fi
+
+        echo "Waiting for frontend readiness ($attempt/30)..."
+        sleep 1
+    done
+
+    echo "Frontend did not become ready at $FRONTEND_READY_URL" >&2
+    pm2 status "$PM2_APP_NAME" || true
+    pm2 logs "$PM2_APP_NAME" --lines 80 --nostream || true
+    return 1
 }
 
 cd "$APP_DIR"
@@ -63,6 +81,7 @@ mv "$NEXT_STAGING_DIR" .next
 trap rollback_frontend ERR
 pm2 delete "$PM2_APP_NAME" >/dev/null 2>&1 || true
 pm2 start "$APP_DIR/ecosystem.config.cjs" --only "$PM2_APP_NAME" --update-env
+wait_for_frontend
 SMOKE_BASE_URL="$FRONTEND_HEALTH_URL" npm run smoke:assets
 pm2 save
 rm -rf "$NEXT_BACKUP_DIR"
