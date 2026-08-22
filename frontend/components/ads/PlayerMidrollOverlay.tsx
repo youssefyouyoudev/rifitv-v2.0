@@ -104,13 +104,15 @@ export function PlayerMidrollOverlay({ isPlaying, children }: Props) {
 
   // Build controller once on mount, capturing stable state setters
   useEffect(() => {
+    const autoClose = autoCloseRef;
+    const tickInterval = tickIntervalRef;
     ctrlRef.current = buildController(
       { setVisible: setOverlayVisible, setLoaded: setOverlayLoaded },
-      autoCloseRef,
+      autoClose,
     );
     return () => {
-      const timer = autoCloseRef.current;
-      const interval = tickIntervalRef.current;
+      const timer = autoClose.current;
+      const interval = tickInterval.current;
       if (timer) clearTimeout(timer);
       if (interval) clearInterval(interval);
     };
@@ -141,7 +143,6 @@ export function PlayerMidrollOverlay({ isPlaying, children }: Props) {
     }
 
     return () => {
-       
       const interval = tickIntervalRef.current;
       if (interval) clearInterval(interval);
     };
