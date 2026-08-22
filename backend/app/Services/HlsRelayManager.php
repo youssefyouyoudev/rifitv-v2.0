@@ -28,6 +28,10 @@ class HlsRelayManager
         $this->terminateDuplicateRelays($ingest);
         $ingest = $this->refreshHealth($ingest);
 
+        if ($this->isStalledRelay($ingest) && $this->canRestartStalledRelay($ingest)) {
+            return $this->startLocked($source, $ingest, true);
+        }
+
         if ($this->trackedRelayAlive($ingest)) {
             return $ingest->refresh();
         }
@@ -39,7 +43,7 @@ class HlsRelayManager
         return $this->startLocked($source, $ingest);
     }
 
-    private function startLocked(StreamSource $source, ?LiveIngest $ingest = null): LiveIngest
+    private function startLocked(StreamSource $source, ?LiveIngest $ingest = null, bool $forceRestart = false): LiveIngest
     {
         $ingest ??= $this->sessionFor($source);
         $ingest = $ingest->refresh();
@@ -69,7 +73,7 @@ class HlsRelayManager
 
         $this->terminateDuplicateRelays($ingest);
 
-        if ($this->trackedRelayAlive($ingest)) {
+        if (! $forceRestart && $this->trackedRelayAlive($ingest)) {
             return $this->refreshHealth($ingest);
         }
 
@@ -100,7 +104,8 @@ class HlsRelayManager
             'restart_count' => $ingest->restart_count + 1,
             'metrics' => [
                 'ffmpeg_args' => $this->sanitizedFfmpegArgs($source, $ingest),
-                'segment_seconds' => (int) config('rifitv.stable_relay.segment_seconds', 2),
+                'segment_seconds' => (int) config('rifitv.stable_relay.segment_seconds', 3),
+                'controlled_restart_at' => now()->toIso8601String(),
             ],
         ]);
 
@@ -287,7 +292,7 @@ class HlsRelayManager
 
     public function ffmpegArgs(string $ffmpeg, StreamSource $source, LiveIngest $ingest): array
     {
-        $segmentSeconds = (string) config('rifitv.stable_relay.segment_seconds', 2);
+        $segmentSeconds = (string) config('rifitv.stable_relay.segment_seconds', 3);
         $listSize = (string) config('rifitv.stable_relay.list_size', 10);
         $deleteThreshold = (string) config('rifitv.stable_relay.delete_threshold', 4);
 
@@ -312,6 +317,8 @@ class HlsRelayManager
             '5xx',
             '-reconnect_delay_max',
             '5',
+            '-rw_timeout',
+            '15000000',
             '-i',
             $source->url,
             '-map',
@@ -376,6 +383,29 @@ class HlsRelayManager
         $pid = (int) trim($process->getOutput());
 
         return $pid > 0 ? $pid : null;
+    }
+
+    private function isStalledRelay(LiveIngest $ingest): bool
+    {
+        return $ingest->status === 'degraded'
+            && $ingest->last_error === 'segment_stall';
+    }
+
+    private function canRestartStalledRelay(LiveIngest $ingest): bool
+    {
+        $metrics = $ingest->metrics ?? [];
+        $lastRestartAt = data_get($metrics, 'controlled_restart_at');
+        $cooldown = (int) config('rifitv.stable_relay.restart_cooldown_seconds', 45);
+
+        if (! $lastRestartAt) {
+            return true;
+        }
+
+        try {
+            return \Illuminate\Support\Carbon::parse((string) $lastRestartAt)->lte(now()->subSeconds($cooldown));
+        } catch (Throwable) {
+            return true;
+        }
     }
 
     private function cleanupOutput(LiveIngest $ingest): void

@@ -7,9 +7,10 @@ export const MPEGTS_PROFILES: Record<MpegTsProfileName, Record<string, unknown>>
     enableStashBuffer: true,
     stashInitialSize: 1024 * 1024,
     autoCleanupSourceBuffer: true,
-    autoCleanupMaxBackwardDuration: 90,
+    autoCleanupMaxBackwardDuration: 120,
     autoCleanupMinBackwardDuration: 30,
     fixAudioTimestampGap: true,
+    reuseRedirectedURL: true,
     liveBufferLatencyChasing: false,
   },
   balanced: {

@@ -3,6 +3,7 @@ import { RecoveryManager } from "../RecoveryManager";
 import { SourceManager } from "../SourceManager";
 import { PlaybackStateMachine } from "../PlaybackStateMachine";
 import { DEFAULT_MPEGTS_PROFILE, MPEGTS_PROFILES } from "../config";
+import { mpegTsIssue } from "../adapters";
 import { reportPlaybackEvent } from "../PlayerUI";
 import type { PlaybackSource } from "@/lib/types";
 
@@ -72,6 +73,22 @@ describe("player core", () => {
     });
   });
 
+  it("treats MediaSource live end as bounded network recovery", () => {
+    const recovery = new RecoveryManager(2, [1000, 2500], 45_000);
+    const source = sources[1];
+    const issue = { kind: "network" as const, fatal: false, message: "MPEG-TS loader closed; reconnecting live stream." };
+
+    expect(recovery.decide(source, issue)).toMatchObject({ action: "retry_current", delayMs: 1000 });
+    expect(recovery.decide(source, issue)).toMatchObject({ action: "switch_source", cooldownMs: 45_000 });
+  });
+
+  it("does not classify tiny MPEG-TS parser tail warnings as unsupported playback", () => {
+    const issue = mpegTsIssue({ type: "NetworkError", detail: "184 bytes unconsumed data remain when flush buffer, dropped" });
+
+    expect(issue.kind).toBe("network");
+    expect(issue.message).toContain("184 bytes unconsumed");
+  });
+
   it("temporarily cools a failed source instead of retrying it in a storm", () => {
     const manager = new SourceManager(sources, new Set(["hls"]), 1);
     manager.markFailed(2, 45_000);
@@ -96,5 +113,6 @@ describe("player core", () => {
     expect(MPEGTS_PROFILES.stable.enableStashBuffer).toBe(true);
     expect(MPEGTS_PROFILES.stable.lazyLoad).toBe(false);
     expect(MPEGTS_PROFILES.stable.liveBufferLatencyChasing).toBe(false);
+    expect(MPEGTS_PROFILES.stable.reuseRedirectedURL).toBe(true);
   });
 });

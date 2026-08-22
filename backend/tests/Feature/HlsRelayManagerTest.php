@@ -243,6 +243,62 @@ it('terminates duplicate relays for the same output path and keeps the tracked p
         ->and($relay->terminated)->toBe([222]);
 });
 
+it('restarts a stalled relay once and does not flap during cooldown', function (): void {
+    config()->set('rifitv.stable_relay.storage_path', storage_path('framework/testing/live-hls'));
+    config()->set('rifitv.stable_relay.ready_segments', 3);
+    config()->set('rifitv.stable_relay.stall_seconds', 8);
+    config()->set('rifitv.stable_relay.restart_cooldown_seconds', 45);
+    $source = StreamSource::factory()->create();
+    $relay = new class extends HlsRelayManager
+    {
+        public int $launches = 0;
+        public array $terminated = [];
+        public string $command = '';
+        private int $pid = 424242;
+
+        protected function ffmpegPath(): ?string
+        {
+            return PHP_BINARY;
+        }
+
+        protected function launchDetachedProcess(array $args): ?int
+        {
+            $this->launches++;
+            $this->pid = 515151;
+            $this->command = 'ffmpeg '.implode(' ', $args);
+
+            return $this->pid;
+        }
+
+        protected function processAlive(?int $pid): bool
+        {
+            return in_array($pid, [424242, 515151], true);
+        }
+
+        protected function processCommand(int $pid): ?string
+        {
+            return in_array($pid, [424242, 515151], true) ? $this->command : null;
+        }
+
+        protected function terminateProcess(int $pid): void
+        {
+            $this->terminated[] = $pid;
+        }
+    };
+    $ingest = $relay->sessionFor($source);
+    $relay->command = 'ffmpeg '.$ingest->output_path.'/index.m3u8';
+    $ingest->update(['status' => 'degraded', 'last_error' => 'segment_stall', 'pid' => 424242, 'restart_count' => 1]);
+
+    $first = $relay->ensure($source);
+    $second = $relay->ensure($source);
+
+    expect($first->pid)->toBe(515151)
+        ->and($relay->terminated)->toBe([424242])
+        ->and($relay->launches)->toBe(1)
+        ->and($second->pid)->toBe(515151)
+        ->and($relay->launches)->toBe(1);
+});
+
 it('requires health jobs to target one source', function (): void {
     expect(fn () => new CheckStreamHealthJob)->toThrow(ArgumentCountError::class);
 

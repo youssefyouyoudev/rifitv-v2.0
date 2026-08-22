@@ -24,7 +24,7 @@ export class PlaybackEngine {
   private startupStartedAt = 0;
   private loadGeneration = 0;
   private destroyed = false;
-  private readonly stablePlaybackResetMs = 15_000;
+  private readonly stablePlaybackResetMs = 25_000;
 
   constructor(
     private readonly video: HTMLVideoElement,
@@ -33,6 +33,7 @@ export class PlaybackEngine {
   ) {
     this.recovery = new RecoveryManager(config.max_recovery_attempts_per_source, config.retry_backoff_ms);
     this.bindNetwork();
+    document.addEventListener("visibilitychange", this.handleVisibilityChange);
   }
 
   on(listener: Listener): () => void {
@@ -98,6 +99,11 @@ export class PlaybackEngine {
     try {
       await this.adapter?.play();
     } catch (error) {
+      if (isAutoplayBlocked(error)) {
+        this.setState("ready", "Tap Play to start the broadcast.");
+        return;
+      }
+
       await this.handleIssue(normalizeIssue(error));
     }
   }
@@ -131,6 +137,7 @@ export class PlaybackEngine {
     this.listeners.clear();
     window.removeEventListener("offline", this.handleOffline);
     window.removeEventListener("online", this.handleOnline);
+    document.removeEventListener("visibilitychange", this.handleVisibilityChange);
   }
 
   private async loadSource(source: PlaybackSource, state: PlaybackState): Promise<void> {
@@ -171,7 +178,7 @@ export class PlaybackEngine {
       onEnded: () => {
         if (!this.isActive(generation, adapter)) return;
         if (this.config.is_live_event) {
-          void this.handleIssue({ kind: "network", fatal: true, message: "Unexpected live stream EOF." }, generation);
+          void this.handleIssue({ kind: "network", fatal: false, message: "Live stream ended unexpectedly; reconnecting.", detail: `${source.id}:${source.protocol}:ended` }, generation);
           return;
         }
         this.setState("ended");
@@ -199,6 +206,11 @@ export class PlaybackEngine {
       this.startStallWatchdog(generation);
       await adapter.play();
     } catch (error) {
+      if (isAutoplayBlocked(error)) {
+        this.setState("ready", "Tap Play to start the broadcast.");
+        return;
+      }
+
       await this.handleIssue(normalizeIssue(error), generation);
     }
   }
@@ -293,6 +305,17 @@ export class PlaybackEngine {
     }
   };
 
+  private readonly handleVisibilityChange = (): void => {
+    if (document.visibilityState !== "visible" || !this.currentSource || this.destroyed) {
+      return;
+    }
+
+    this.checkLiveDrift();
+    if (this.stateMachine.state() === "playing" && this.video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
+      void this.handleIssue({ kind: "stall", fatal: false, message: "Playback needs foreground recovery." }, this.loadGeneration);
+    }
+  };
+
   private setState(state: PlaybackState, message?: string): void {
     this.stateMachine.transition(state);
     this.emit({ type: "state", state: this.stateMachine.state(), message });
@@ -358,4 +381,8 @@ function normalizeIssue(error: unknown): PlaybackIssue {
     fatal: true,
     message: error instanceof Error ? error.message : "Playback failed.",
   };
+}
+
+function isAutoplayBlocked(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "NotAllowedError";
 }

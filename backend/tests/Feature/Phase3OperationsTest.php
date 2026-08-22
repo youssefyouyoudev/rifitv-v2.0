@@ -2,11 +2,13 @@
 
 use App\Enums\MatchStatus;
 use App\Enums\StreamHealth;
+use App\Enums\StreamProtocol;
 use App\Models\Channel;
 use App\Models\Competition;
 use App\Models\CompetitionProviderMapping;
 use App\Models\FixtureImportLog;
 use App\Models\GameMatch;
+use App\Models\LiveIngest;
 use App\Models\OperationalAlert;
 use App\Models\Role;
 use App\Models\StreamSource;
@@ -14,6 +16,7 @@ use App\Models\Team;
 use App\Models\TeamProviderMapping;
 use App\Models\User;
 use App\Services\FixtureSyncService;
+use App\Services\HlsRelayManager;
 use App\Services\OperationalAlertService;
 use App\Services\PlaybackSourceSelector;
 use App\Services\ResultSyncService;
@@ -154,6 +157,49 @@ it('prioritizes healthy playback backups ahead of offline primary sources', func
 
     expect($response['default_source_id'])->toBe($healthy->id)
         ->and($response['sources'][0]['health_score'])->toBe(95);
+});
+
+it('prefers a ready hls relay over raw mpegts playback', function (): void {
+    config()->set('rifitv.stable_relay.enabled', true);
+    config()->set('rifitv.stable_relay.default_for_mpegts', true);
+    config()->set('rifitv.stable_relay.public_base_url', 'https://api.rifitv.test/media/hls');
+    $channel = Channel::factory()->create();
+    $match = GameMatch::factory()->create([
+        'kickoff_at' => now()->subMinutes(5),
+        'actual_started_at' => now()->subMinutes(5),
+    ]);
+    $match->channels()->attach($channel->id, ['sort_order' => 10]);
+    $source = StreamSource::factory()->create([
+        'channel_id' => $channel->id,
+        'protocol' => StreamProtocol::MpegTs,
+        'last_known_status' => StreamHealth::Healthy,
+    ]);
+    $this->app->instance(HlsRelayManager::class, new class extends HlsRelayManager
+    {
+        public function ffmpegAvailable(): bool
+        {
+            return true;
+        }
+
+        public function ensure(StreamSource $source): LiveIngest
+        {
+            $ingest = $this->sessionFor($source);
+            $ingest->update([
+                'status' => 'ready',
+                'segment_count' => 4,
+                'last_segment_at' => now(),
+            ]);
+
+            return $ingest->refresh();
+        }
+    });
+
+    $response = app(PlaybackSourceSelector::class)->responseFor($match->fresh('channels.streamSources'));
+
+    expect($response['default_source_id'])->toBe($source->id)
+        ->and($response['sources'][0]['protocol'])->toBe('hls')
+        ->and($response['sources'][0]['transport'])->toBe('hls_relay')
+        ->and($response['sources'][0]['playback_url'])->toContain('/media/hls/src-');
 });
 
 it('dedupes operational alerts and accepts anonymous playback events', function (): void {

@@ -18,6 +18,7 @@ export type PlaybackIssue = {
   kind: PlaybackIssueKind;
   fatal: boolean;
   message: string;
+  detail?: string;
 };
 
 export type QualityLevel = {

@@ -21,6 +21,10 @@ export class RecoveryManager {
       return { action: "fail", reason: "No active source." };
     }
 
+    if (issue.kind === "unsupported") {
+      return { action: "switch_source", reason: issue.message, cooldownMs: this.networkCooldownMs };
+    }
+
     const nextAttempt = (this.attempts.get(source.id) ?? 0) + 1;
     this.attempts.set(source.id, nextAttempt);
 

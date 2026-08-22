@@ -40,6 +40,7 @@ type MpegTsModule = {
   getFeatureList(): { mseLivePlayback: boolean };
   createPlayer(config: Record<string, unknown>, options: Record<string, unknown>): MpegTsPlayer;
   Events: Record<"ERROR" | "LOADING_COMPLETE", string>;
+  ErrorTypes?: Record<string, string>;
 };
 
 export async function supportedProtocols(): Promise<Set<StreamProtocol>> {
@@ -102,12 +103,15 @@ class HlsAdapter implements PlaybackAdapter {
 
     this.hls = new Hls({
       liveSyncDurationCount: 3,
-      liveMaxLatencyDurationCount: 5,
+      liveMaxLatencyDurationCount: 8,
       maxBufferLength: 30,
       backBufferLength: 30,
+      maxBufferHole: 1,
+      nudgeOffset: 0.2,
+      nudgeMaxRetry: 5,
       enableWorker: true,
       lowLatencyMode: false,
-      fragLoadingTimeOut: 15_000,
+      fragLoadingTimeOut: 20_000,
       manifestLoadingTimeOut: 10_000,
       levelLoadingTimeOut: 10_000,
     });
@@ -123,6 +127,7 @@ class HlsAdapter implements PlaybackAdapter {
         kind: data.type?.includes("MEDIA") ? "media" : "network",
         fatal: data.fatal,
         message: data.details ?? "HLS playback error",
+        detail: `${data.type ?? "unknown"}:${data.details ?? "unknown"}`,
       });
     });
     this.bindVideoEvents(video);
@@ -204,10 +209,11 @@ class MpegTsAdapter implements PlaybackAdapter {
       MPEGTS_PROFILES[DEFAULT_MPEGTS_PROFILE],
     );
     this.player.on(mpegts.Events.ERROR, (_event, data) => {
-      this.events.onIssue({ kind: "network", fatal: true, message: String(data) });
+      const issue = mpegTsIssue(data);
+      this.events.onIssue(issue);
     });
     this.player.on(mpegts.Events.LOADING_COMPLETE, () => {
-      this.events.onIssue({ kind: "network", fatal: true, message: "Unexpected MPEG-TS loader EOF." });
+      this.events.onIssue({ kind: "network", fatal: false, message: "MPEG-TS loader closed; reconnecting live stream.", detail: "loading_complete" });
     });
     this.bindVideoEvents(video);
     this.player.attachMediaElement(video);
@@ -243,6 +249,19 @@ class MpegTsAdapter implements PlaybackAdapter {
     video.onended = () => this.events.onEnded();
     video.onerror = () => this.events.onIssue({ kind: "media", fatal: true, message: "Video playback error" });
   }
+}
+
+export function mpegTsIssue(data: unknown): PlaybackIssue {
+  const text = typeof data === "string" ? data : JSON.stringify(data);
+  const lower = text.toLowerCase();
+  const isMedia = lower.includes("media") || lower.includes("mse") || lower.includes("codec");
+
+  return {
+    kind: isMedia ? "media" : "network",
+    fatal: true,
+    message: text,
+    detail: text.slice(0, 200),
+  };
 }
 
 function clearVideoEvents(video: HTMLVideoElement): void {
