@@ -14,28 +14,35 @@ class HlsRelayManager
 {
     public function ensure(StreamSource $source): LiveIngest
     {
-        return Cache::lock('live_ingest:'.$source->id, 10)->block(3, function () use ($source): LiveIngest {
-            $ingest = $this->sessionFor($source);
-            $this->refreshHealth($ingest);
-
-            if (
-                in_array($ingest->status, ['starting', 'ready', 'reconnecting'], true)
-                && $this->processAlive($ingest->pid)
-            ) {
-                return $ingest->refresh();
-            }
-
-            if ($ingest->pid) {
-                $this->terminatePid($ingest->pid, $ingest);
-            }
-
-            return $this->start($source, $ingest);
-        });
+        return $this->withSourceLock($source, fn (): LiveIngest => $this->ensureLocked($source));
     }
 
     public function start(StreamSource $source, ?LiveIngest $ingest = null): LiveIngest
     {
+        return $this->withSourceLock($source, fn (): LiveIngest => $this->startLocked($source, $ingest));
+    }
+
+    private function ensureLocked(StreamSource $source): LiveIngest
+    {
+        $ingest = $this->sessionFor($source)->refresh();
+        $this->terminateDuplicateRelays($ingest);
+        $ingest = $this->refreshHealth($ingest);
+
+        if ($this->trackedRelayAlive($ingest)) {
+            return $ingest->refresh();
+        }
+
+        if ($ingest->pid) {
+            $this->terminatePid($ingest->pid, $ingest);
+        }
+
+        return $this->startLocked($source, $ingest);
+    }
+
+    private function startLocked(StreamSource $source, ?LiveIngest $ingest = null): LiveIngest
+    {
         $ingest ??= $this->sessionFor($source);
+        $ingest = $ingest->refresh();
         $ffmpeg = $this->ffmpegPath();
 
         if (! $ffmpeg) {
@@ -60,6 +67,12 @@ class HlsRelayManager
             }
         }
 
+        $this->terminateDuplicateRelays($ingest);
+
+        if ($this->trackedRelayAlive($ingest)) {
+            return $this->refreshHealth($ingest);
+        }
+
         if ($ingest->pid) {
             $this->terminatePid($ingest->pid, $ingest);
         }
@@ -68,7 +81,7 @@ class HlsRelayManager
 
         $pid = $this->launchDetachedProcess($this->ffmpegArgs($ffmpeg, $source, $ingest));
 
-        if (! $pid || $pid <= 0 || ! $this->processAlive($pid)) {
+        if (! $pid || $pid <= 0 || ! $this->processAlive($pid) || ! $this->isExpectedRelayProcess($pid, $ingest)) {
             $ingest->update([
                 'status' => 'failed',
                 'pid' => null,
@@ -91,32 +104,55 @@ class HlsRelayManager
             ],
         ]);
 
+        $this->terminateDuplicateRelays($ingest->refresh());
+
         return $ingest->refresh();
     }
 
     public function stop(StreamSource $source): LiveIngest
     {
-        $ingest = $this->sessionFor($source);
+        return $this->withSourceLock($source, function () use ($source): LiveIngest {
+            $ingest = $this->sessionFor($source)->refresh();
 
-        if ($ingest->pid) {
-            $this->terminatePid($ingest->pid, $ingest);
-        }
+            if ($ingest->pid) {
+                $this->terminatePid($ingest->pid, $ingest);
+            }
 
-        $ingest->update([
-            'status' => 'stopped',
-            'pid' => null,
-            'last_error' => null,
-        ]);
+            $this->terminateDuplicateRelays($ingest);
+            $this->cleanupOutput($ingest);
 
-        return $ingest->refresh();
+            $ingest->update([
+                'status' => 'stopped',
+                'pid' => null,
+                'last_error' => null,
+                'ready_at' => null,
+                'segment_count' => 0,
+                'last_segment_at' => null,
+            ]);
+
+            return $ingest->refresh();
+        });
     }
 
     public function resetStale(LiveIngest $ingest, string $reason = 'relay_reset_after_lifecycle_fix'): LiveIngest
     {
+        if ($ingest->stream_source_id) {
+            return Cache::lock('live_ingest:'.$ingest->stream_source_id, 10)
+                ->block(3, fn (): LiveIngest => $this->resetStaleUnlocked($ingest, $reason));
+        }
+
+        return $this->resetStaleUnlocked($ingest, $reason);
+    }
+
+    private function resetStaleUnlocked(LiveIngest $ingest, string $reason): LiveIngest
+    {
+        $ingest = $ingest->refresh();
+
         if ($ingest->pid) {
             $this->terminatePid($ingest->pid, $ingest);
         }
 
+        $this->terminateDuplicateRelays($ingest);
         $this->cleanupOutput($ingest);
 
         $ingest->update([
@@ -148,7 +184,7 @@ class HlsRelayManager
         $segmentsFresh = $lastSegmentAt
             && $lastSegmentAt >= now()->subSeconds($stallSeconds)->timestamp;
 
-        $processAlive = $this->processAlive($ingest->pid);
+        $processAlive = $this->trackedRelayAlive($ingest);
         $startupExpired = $ingest->status === 'starting'
             && $ingest->process_started_at
             && $ingest->process_started_at->lt(now()->subSeconds($startupTimeout));
@@ -192,7 +228,7 @@ class HlsRelayManager
         return $ingest->refresh();
     }
 
-    private function processAlive(?int $pid): bool
+    protected function processAlive(?int $pid): bool
     {
         if (! $pid || $pid <= 0) {
             return false;
@@ -376,13 +412,28 @@ class HlsRelayManager
     {
         if (PHP_OS_FAMILY === 'Windows') {
             if ($this->isExpectedRelayProcess($pid, $ingest)) {
-                Process::fromShellCommandline('taskkill /PID '.((int) $pid).' /T /F')->run();
+                $this->terminateProcess($pid);
             }
 
             return;
         }
 
         if (! function_exists('posix_kill') || ! $this->processAlive($pid) || ! $this->isExpectedRelayProcess($pid, $ingest)) {
+            return;
+        }
+
+        $this->terminateProcess($pid);
+    }
+
+    protected function terminateProcess(int $pid): void
+    {
+        if (PHP_OS_FAMILY === 'Windows') {
+            Process::fromShellCommandline('taskkill /PID '.((int) $pid).' /T /F')->run();
+
+            return;
+        }
+
+        if (! function_exists('posix_kill')) {
             return;
         }
 
@@ -414,7 +465,71 @@ class HlsRelayManager
             || str_contains($command, (string) $ingest->session_key);
     }
 
-    private function processCommand(int $pid): ?string
+    private function trackedRelayAlive(LiveIngest $ingest): bool
+    {
+        return $ingest->pid
+            && $this->processAlive($ingest->pid)
+            && $this->isExpectedRelayProcess($ingest->pid, $ingest);
+    }
+
+    private function terminateDuplicateRelays(LiveIngest $ingest): void
+    {
+        if (! $this->safeOutputPath($ingest)) {
+            return;
+        }
+
+        $trackedPid = $this->trackedRelayAlive($ingest) ? $ingest->pid : null;
+
+        foreach ($this->relayPidsForOutputPath($ingest->output_path) as $pid) {
+            if ($trackedPid && $pid === $trackedPid) {
+                continue;
+            }
+
+            $this->terminatePid($pid, $ingest);
+        }
+    }
+
+    protected function relayPidsForOutputPath(string $outputPath): array
+    {
+        if (PHP_OS_FAMILY === 'Windows') {
+            return [];
+        }
+
+        try {
+            $process = new Process(['ps', '-eo', 'pid=,command=']);
+            $process->setTimeout(3);
+            $process->run();
+
+            if (! $process->isSuccessful()) {
+                return [];
+            }
+
+            $pids = [];
+            foreach (explode("\n", $process->getOutput()) as $line) {
+                $line = trim($line);
+                if ($line === '' || ! preg_match('/^(\d+)\s+(.+)$/', $line, $matches)) {
+                    continue;
+                }
+
+                $pid = (int) $matches[1];
+                $command = $matches[2];
+                if ($pid > 0 && str_contains(Str::lower($command), 'ffmpeg') && str_contains($command, $outputPath)) {
+                    $pids[] = $pid;
+                }
+            }
+
+            return array_values(array_unique($pids));
+        } catch (Throwable) {
+            return [];
+        }
+    }
+
+    private function withSourceLock(StreamSource $source, callable $callback): LiveIngest
+    {
+        return Cache::lock('live_ingest:'.$source->id, 10)->block(3, $callback);
+    }
+
+    protected function processCommand(int $pid): ?string
     {
         try {
             $cmdline = "/proc/{$pid}/cmdline";
