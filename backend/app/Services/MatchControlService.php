@@ -17,6 +17,7 @@ class MatchControlService
     public function __construct(
         private readonly AuditService $audit,
         private readonly PlaybackWindowService $playbackWindow,
+        private readonly PublicContentService $content,
     ) {}
 
     public function payload(GameMatch $match): array
@@ -113,6 +114,44 @@ class MatchControlService
             'minute' => isset($data['minute']) ? max(0, min(130, (int) $data['minute'])) : $match->minute,
         ]);
         $this->audit->record($actor, 'match.score_updated', $match, ['before' => $before]);
+
+        return $match->fresh(['competition', 'season', 'homeTeam', 'awayTeam', 'channels.streamSources', 'broadcasts.broadcaster', 'broadcasts.channel']);
+    }
+
+    public function updateKickoff(GameMatch $match, array $data, ?User $actor): GameMatch
+    {
+        $timezone = (string) ($data['timezone'] ?? config('rifitv.display_timezone', 'Africa/Casablanca'));
+        $kickoff = Carbon::parse((string) $data['kickoff_at'], $timezone);
+        $manualOverrides = $match->manual_overrides ?? [];
+        data_set($manualOverrides, 'kickoff_at', true);
+        $before = $match->only(['kickoff_at', 'scheduled_date', 'kickoff_precision', 'kickoff_status', 'source_timezone']);
+
+        $match->update([
+            'kickoff_at' => $kickoff->copy()->utc(),
+            'scheduled_date' => $kickoff->toDateString(),
+            'kickoff_precision' => 'confirmed',
+            'kickoff_status' => 'admin_override',
+            'source_timezone' => $timezone,
+            'manual_overrides' => $manualOverrides,
+        ]);
+
+        $this->audit->record($actor, 'match.kickoff_overridden', $match, [
+            'before' => $before,
+            'timezone' => $timezone,
+            'reason' => $data['reason'] ?? null,
+        ]);
+        $this->content->forgetHome();
+
+        return $match->fresh(['competition', 'season', 'homeTeam', 'awayTeam', 'channels.streamSources', 'broadcasts.broadcaster', 'broadcasts.channel']);
+    }
+
+    public function restoreProviderKickoff(GameMatch $match, ?User $actor): GameMatch
+    {
+        $manualOverrides = $match->manual_overrides ?? [];
+        data_forget($manualOverrides, 'kickoff_at');
+        $match->update(['manual_overrides' => $manualOverrides]);
+        $this->audit->record($actor, 'match.kickoff_restore_provider', $match);
+        $this->content->forgetHome();
 
         return $match->fresh(['competition', 'season', 'homeTeam', 'awayTeam', 'channels.streamSources', 'broadcasts.broadcaster', 'broadcasts.channel']);
     }

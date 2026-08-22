@@ -57,6 +57,25 @@ class AdminMatchControlController extends Controller
         return response()->json(['data' => $service->payload($service->playbackAction($match, $validated['action'], $request->user()))]);
     }
 
+    public function kickoff(Request $request, GameMatch $match, MatchControlService $service)
+    {
+        abort_unless($request->user()?->hasPermission('matches.manage'), 403);
+        $validated = $request->validate([
+            'kickoff_at' => ['required', 'date'],
+            'timezone' => ['nullable', 'timezone'],
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        return response()->json(['data' => $service->payload($service->updateKickoff($match, $validated, $request->user()))]);
+    }
+
+    public function restoreProviderKickoff(Request $request, GameMatch $match, MatchControlService $service)
+    {
+        abort_unless($request->user()?->hasPermission('matches.manage'), 403);
+
+        return response()->json(['data' => $service->payload($service->restoreProviderKickoff($match, $request->user()))]);
+    }
+
     public function score(Request $request, GameMatch $match, MatchControlService $service)
     {
         abort_unless($request->user()?->hasPermission('scores.manage'), 403);

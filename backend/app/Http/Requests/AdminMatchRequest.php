@@ -21,6 +21,7 @@ class AdminMatchRequest extends FormRequest
             'home_team_id' => ['required', 'integer', 'exists:teams,id', 'different:away_team_id'],
             'away_team_id' => ['required', 'integer', 'exists:teams,id'],
             'kickoff_at' => ['required', 'date'],
+            'timezone' => ['sometimes', 'timezone'],
             'status' => ['sometimes', Rule::in(array_column(MatchStatus::cases(), 'value'))],
             'home_score' => ['nullable', 'integer', 'min:0', 'max:99'],
             'away_score' => ['nullable', 'integer', 'min:0', 'max:99'],

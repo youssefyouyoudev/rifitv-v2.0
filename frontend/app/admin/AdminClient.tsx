@@ -64,6 +64,9 @@ type Match = Entity & {
   kickoff_at: string | null;
   scheduled_date?: string | null;
   kickoff_precision?: string;
+  kickoff_status?: string | null;
+  source_timezone?: string | null;
+  manual_overrides?: Record<string, boolean> | null;
   verification_status?: string;
   channels?: Entity[];
   channels_count?: number;
@@ -1505,6 +1508,7 @@ function MatchControlCenter({ matches, channels, control, selectedId, onSelectMa
               ))}
             </div>
           </Panel>
+          <KickoffEditor key={`${selected.id}-${selected.kickoff_at ?? ""}-${selected.scheduled_date ?? ""}-${selected.source_timezone ?? ""}`} selected={selected} run={run} adminSend={adminSend} loadControl={loadControl} />
           <Panel title="Playback Window">
             <div className="grid gap-2 text-sm text-neutral-300 sm:grid-cols-3">
               <span>Status: {control?.playback_window.status}</span>
@@ -1573,6 +1577,35 @@ function MatchControlCenter({ matches, channels, control, selectedId, onSelectMa
         </div>
       ) : null}
     </div>
+  );
+}
+
+function KickoffEditor({ selected, run, adminSend, loadControl }: ManagerProps & { selected: Match; loadControl: (matchId: number) => Promise<void> }) {
+  const [kickoffForm, setKickoffForm] = useState(() => ({
+    kickoff_at: selected.kickoff_at ? localDateTimeInput(new Date(selected.kickoff_at)) : selected.scheduled_date ? `${selected.scheduled_date}T12:00` : localDateTime(),
+    timezone: selected.source_timezone ?? "Africa/Casablanca",
+    reason: "",
+  }));
+
+  return (
+    <Panel title="Kickoff Time">
+      <div className="grid gap-3 md:grid-cols-[1fr_180px]">
+        <Input label="Kickoff" type="datetime-local" value={kickoffForm.kickoff_at} onChange={(kickoff_at) => setKickoffForm({ ...kickoffForm, kickoff_at })} />
+        <Input label="Timezone" value={kickoffForm.timezone} onChange={(timezone) => setKickoffForm({ ...kickoffForm, timezone })} />
+      </div>
+      <Input label="Reason" value={kickoffForm.reason} onChange={(reason) => setKickoffForm({ ...kickoffForm, reason })} />
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-white/10 bg-black/20 p-3 text-sm text-neutral-300">
+        <span>{selected.manual_overrides?.kickoff_at ? "Manual override active" : `Provider time: ${selected.kickoff_status ?? selected.kickoff_precision ?? "unknown"}`}</span>
+        <div className="flex flex-wrap gap-2">
+          <button className="h-9 rounded-md bg-red-600 px-3 text-xs font-semibold text-white" onClick={() => run(async () => { await adminSend(`/admin/matches/${selected.id}/control/kickoff`, "PATCH", kickoffForm); await loadControl(selected.id); }, "Kickoff updated")}>
+            <Save className="mr-2 inline h-4 w-4" />Save
+          </button>
+          <button className="h-9 rounded-md border border-white/10 px-3 text-xs text-white" onClick={() => run(async () => { await adminSend(`/admin/matches/${selected.id}/control/kickoff/restore-provider`, "POST"); await loadControl(selected.id); }, "Provider kickoff restored")}>
+            <RotateCcw className="mr-2 inline h-4 w-4" />Provider
+          </button>
+        </div>
+      </div>
+    </Panel>
   );
 }
 

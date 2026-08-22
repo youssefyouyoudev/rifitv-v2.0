@@ -1,0 +1,54 @@
+{
+  "competition": "bundesliga",
+  "season": "2026-27",
+  "retrieved_at": "2026-08-22T12:00:00Z",
+  "source": "https://www.bundesliga.com/en/bundesliga/matchday",
+  "fixtures": [
+    {
+      "competition": "bundesliga",
+      "season": "2026-27",
+      "provider": "official-bundesliga",
+      "external_id": "bundesliga-2026-08-28-bayern-munich-vfb-stuttgart",
+      "matchday": 1,
+      "round_label": "Matchday 1",
+      "home_team": "Bayern Munich",
+      "away_team": "VfB Stuttgart",
+      "scheduled_date": "2026-08-28",
+      "kickoff_local": "20:30",
+      "source_timezone": "Europe/Berlin",
+      "kickoff_status": "confirmed",
+      "status": "scheduled",
+      "source_reference": "https://www.bundesliga.com/en/bundesliga/matchday",
+      "broadcast": {
+        "network": "beIN SPORTS MENA",
+        "territory": "MENA / Arabic",
+        "status": "tbc",
+        "specific_channel": null,
+        "streaming_platform": null
+      }
+    },
+    {
+      "competition": "bundesliga",
+      "season": "2026-27",
+      "provider": "official-bundesliga",
+      "external_id": "bundesliga-2026-08-29-borussia-dortmund-hamburger-sv",
+      "matchday": 1,
+      "round_label": "Matchday 1",
+      "home_team": "Borussia Dortmund",
+      "away_team": "Hamburger SV",
+      "scheduled_date": "2026-08-29",
+      "kickoff_local": "18:30",
+      "source_timezone": "Europe/Berlin",
+      "kickoff_status": "confirmed",
+      "status": "scheduled",
+      "source_reference": "https://www.bundesliga.com/en/bundesliga/matchday",
+      "broadcast": {
+        "network": "beIN SPORTS MENA",
+        "territory": "MENA / Arabic",
+        "status": "tbc",
+        "specific_channel": null,
+        "streaming_platform": null
+      }
+    }
+  ]
+}

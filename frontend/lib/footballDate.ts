@@ -70,8 +70,8 @@ export function addDays(date: string, amount: number): string {
   return parsed.toISOString().slice(0, 10);
 }
 
-export function localDateTimeInput(): string {
-  const parts = dateTimePartsFormatter.formatToParts(new Date());
+export function localDateTimeInput(value: Date = new Date()): string {
+  const parts = dateTimePartsFormatter.formatToParts(value);
   const year = partValue(parts, "year");
   const month = partValue(parts, "month");
   const day = partValue(parts, "day");
@@ -79,7 +79,7 @@ export function localDateTimeInput(): string {
   const minute = new Intl.DateTimeFormat("en-GB", {
     minute: "2-digit",
     timeZone: RI_FI_TV_TIMEZONE,
-  }).format(new Date());
+  }).format(value);
 
   return `${year}-${month}-${day}T${hour}:${minute}`;
 }

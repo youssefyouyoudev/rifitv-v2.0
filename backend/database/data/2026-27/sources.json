@@ -7,7 +7,9 @@
     "laliga-ea-sports": "https://www.laliga.com/en-GB/laliga-easports/calendar",
     "laliga-json": "https://assets.laliga.com/assets/calendar/calendar-102-1.json",
     "ligue-1-psg": "https://www.psg.fr/en/mens-football/fixtures",
-    "ligue-1-psg-api": "https://api.psg.fr/umbraco/delivery/api/v2/content?take=80&filter=contentType:matchSheet&filter=matchSeason:2026-2027&filter=matchTeam:2b3mar72yy8d6uvat1ka6tn3r&filter=matchCompetition:dm5ka0os1e3dxcp3vh05kmp33&sort=matchDate:asc"
+    "ligue-1-psg-api": "https://api.psg.fr/umbraco/delivery/api/v2/content?take=80&filter=contentType:matchSheet&filter=matchSeason:2026-2027&filter=matchTeam:2b3mar72yy8d6uvat1ka6tn3r&filter=matchCompetition:dm5ka0os1e3dxcp3vh05kmp33&sort=matchDate:asc",
+    "german-super-cup": "https://www.bundesliga.com/en/bundesliga/news/franz-beckenbauer-supercup",
+    "bundesliga": "https://www.bundesliga.com/en/bundesliga/matchday"
   },
   "premier-league-rifitv.json": {
     "checksum": "2e8e4e6dcb25d484ec8d561d055dbaeb0c282d007e10c228be5fe467f4ca6071",
@@ -20,5 +22,13 @@
   "ligue1-psg.json": {
     "checksum": "5a33f1fb0807ae698cbeb5d0d6e04e9ef33be8e52679367b3dcd247a7aab33f8",
     "records": 34
+  },
+  "german-supercup-rifitv.json": {
+    "checksum": "018a20e03c90dadc19608f2acfe1d0591aa1df1a290b7b31ed711911d977c49c",
+    "records": 1
+  },
+  "bundesliga-rifitv.json": {
+    "checksum": "d744d4fbb54c7171be11d23b8f87e04fd15005643d0e156608a7eae600b6d66d",
+    "records": 2
   }
 }

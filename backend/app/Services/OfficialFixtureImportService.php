@@ -6,6 +6,7 @@ use App\Enums\CompetitionSelectionMode;
 use App\Enums\MatchStatus;
 use App\Enums\MatchVisibility;
 use App\Models\Broadcaster;
+use App\Models\Channel;
 use App\Models\Competition;
 use App\Models\GameMatch;
 use App\Models\MatchBroadcast;
@@ -23,7 +24,7 @@ class OfficialFixtureImportService
         private readonly MatchSlugService $slugs,
     ) {}
 
-    /** @var array<string, array{name:string,short_name:string,country_code:?string,logo_path:string,sort_order:int,selection_mode:CompetitionSelectionMode}> */
+    /** @var array<string, array{name:string,short_name:string,country_code:?string,logo_path:?string,sort_order:int,selection_mode:CompetitionSelectionMode}> */
     private array $competitions = [
         'premier-league' => [
             'name' => 'Premier League',
@@ -57,6 +58,30 @@ class OfficialFixtureImportService
             'sort_order' => 40,
             'selection_mode' => CompetitionSelectionMode::ManualOnly,
         ],
+        'bundesliga' => [
+            'name' => 'Bundesliga',
+            'short_name' => 'Bundesliga',
+            'country_code' => 'DE',
+            'logo_path' => null,
+            'sort_order' => 35,
+            'selection_mode' => CompetitionSelectionMode::FeaturedTeamsOnly,
+        ],
+        'german-super-cup' => [
+            'name' => 'Franz Beckenbauer Supercup',
+            'short_name' => 'German Super Cup',
+            'country_code' => 'DE',
+            'logo_path' => null,
+            'sort_order' => 45,
+            'selection_mode' => CompetitionSelectionMode::AllMatches,
+        ],
+        'dfb-pokal' => [
+            'name' => 'DFB-Pokal',
+            'short_name' => 'DFB-Pokal',
+            'country_code' => 'DE',
+            'logo_path' => null,
+            'sort_order' => 46,
+            'selection_mode' => CompetitionSelectionMode::ManualOnly,
+        ],
     ];
 
     /** @var array<string, list<string>> */
@@ -64,6 +89,8 @@ class OfficialFixtureImportService
         'premier-league' => ['arsenal', 'chelsea', 'liverpool', 'manchester-city', 'manchester-united', 'tottenham-hotspur'],
         'laliga-ea-sports' => ['fc-barcelona', 'real-madrid', 'atletico-de-madrid'],
         'ligue-1' => ['paris-saint-germain'],
+        'bundesliga' => ['bayern-munich', 'borussia-dortmund', 'vfb-stuttgart', 'hamburger-sv'],
+        'german-super-cup' => ['bayern-munich', 'borussia-dortmund'],
     ];
 
     /** @var array<string, list<string>> */
@@ -86,6 +113,10 @@ class OfficialFixtureImportService
         'rc-deportivo' => ['Deportivo La Coruna'],
         'ca-osasuna' => ['Osasuna'],
         'paris-saint-germain' => ['PSG', 'Paris SG', 'Paris'],
+        'bayern-munich' => ['Bayern', 'FC Bayern München', 'FC Bayern Munich', 'بايرن', 'بايرن ميونخ'],
+        'borussia-dortmund' => ['Dortmund', 'BVB', 'دورتموند', 'بوروسيا دورتموند'],
+        'vfb-stuttgart' => ['Stuttgart', 'VfB', 'شتوتغارت'],
+        'hamburger-sv' => ['Hamburg', 'HSV', 'هامبورغ'],
     ];
 
     /** @var array<string, string> */
@@ -93,6 +124,8 @@ class OfficialFixtureImportService
         'premier-league' => 'official-premier-league',
         'laliga-ea-sports' => 'official-laliga',
         'ligue-1' => 'official-psg',
+        'bundesliga' => 'official-bundesliga',
+        'german-super-cup' => 'official-german-super-cup',
     ];
 
     /** @var array<string, int> */
@@ -100,6 +133,8 @@ class OfficialFixtureImportService
         'premier-league' => 198,
         'laliga-ea-sports' => 108,
         'ligue-1' => 34,
+        'bundesliga' => 2,
+        'german-super-cup' => 1,
     ];
 
     /** @return array{competitions:int,seasons:int,teams:int,matches:int,broadcasts:int,dry_run:bool} */
@@ -124,6 +159,7 @@ class OfficialFixtureImportService
 
         DB::transaction(function () use ($datasets, &$summary, $dryRun): void {
             $this->ensureAllCompetitions();
+            $this->ensureArabicChannelCatalog();
 
             $selectedExternalIds = $datasets
                 ->flatMap(fn (array $dataset): array => collect($dataset['fixtures'])->pluck('external_id')->all())
@@ -139,7 +175,6 @@ class OfficialFixtureImportService
             foreach ($datasets as $dataset) {
                 $competition = $this->competition($dataset['competition']);
                 $season = $this->season($competition, $dataset);
-                $broadcaster = $this->menaBroadcaster();
                 $featuredTeamIds = [];
 
                 foreach ($dataset['fixtures'] as $fixture) {
@@ -153,7 +188,7 @@ class OfficialFixtureImportService
                     }
 
                     $match = $this->match($competition, $season, $home, $away, $fixture);
-                    $this->broadcast($match, $broadcaster, $fixture);
+                    $this->broadcast($match, $this->broadcasterFor($fixture), $fixture);
 
                     $summary['matches']++;
                     $summary['broadcasts']++;
@@ -186,6 +221,8 @@ class OfficialFixtureImportService
             'premier-league-rifitv.json' => 'premier-league',
             'laliga-rifitv.json' => 'laliga-ea-sports',
             'ligue1-psg.json' => 'ligue-1',
+            'bundesliga-rifitv.json' => 'bundesliga',
+            'german-supercup-rifitv.json' => 'german-super-cup',
         ];
 
         return collect($files)
@@ -259,12 +296,44 @@ class OfficialFixtureImportService
         );
     }
 
-    private function menaBroadcaster(): Broadcaster
+    private function broadcasterFor(array $fixture): Broadcaster
     {
+        $network = (string) data_get($fixture, 'broadcast.network', 'beIN SPORTS MENA');
+        $slug = Str::slug(Str::ascii($network));
+
         return Broadcaster::query()->updateOrCreate(
-            ['slug' => 'bein-sports-mena'],
-            ['name' => 'beIN SPORTS MENA', 'territory' => 'MENA', 'active' => true]
+            ['slug' => $slug],
+            ['name' => $network, 'territory' => 'MENA', 'active' => true]
         );
+    }
+
+    private function ensureArabicChannelCatalog(): void
+    {
+        foreach ([
+            ['MBC Action', 'إم بي سي أكشن', 5],
+            ['beIN Sports MENA', 'beIN Sports MENA', 10],
+            ['SSC', 'SSC', 20],
+            ['Abu Dhabi Sports', 'أبوظبي الرياضية', 30],
+            ['Dubai Sports', 'دبي الرياضية', 40],
+            ['Al Kass', 'الكأس', 50],
+        ] as [$name, $canonical, $sort]) {
+            Channel::query()->updateOrCreate(
+                ['slug' => Str::slug(Str::ascii($name))],
+                [
+                    'name' => $name,
+                    'canonical_name' => $canonical,
+                    'normalized_name' => Str::lower(Str::ascii($name)),
+                    'language' => 'ar',
+                    'category' => 'sports',
+                    'playlist_group' => 'Arabic Sports',
+                    'normalized_group' => 'Arabic Sports',
+                    'metadata' => ['region' => 'MENA', 'broadcaster_only' => true],
+                    'active' => true,
+                    'favorite' => true,
+                    'sort_order' => $sort,
+                ]
+            );
+        }
     }
 
     private function team(string $name, ?string $countryCode): Team
@@ -275,7 +344,7 @@ class OfficialFixtureImportService
         $team->forceFill([
             'name' => $name,
             'short_name' => $this->shortName($name),
-            'logo_path' => "/football/clubs/{$slug}.png",
+            'logo_path' => $this->localAssetExists("/football/clubs/{$slug}.png") ? "/football/clubs/{$slug}.png" : null,
             'country_code' => $countryCode,
             'active' => true,
             'featured' => in_array($slug, $this->featuredTeamSlugs(), true),
@@ -304,6 +373,9 @@ class OfficialFixtureImportService
         }
 
         $match = GameMatch::withTrashed()->firstOrNew(['provider' => $fixture['provider'], 'external_id' => $fixture['external_id']]);
+        $manualKickoff = $match->exists && $match->hasManualOverride('kickoff_at');
+        $manualStatus = $match->exists && $match->hasManualOverride('status');
+        $manualFeatured = $match->exists && $match->hasManualOverride('featured');
         $match->fill([
             'competition_id' => $competition->id,
             'season_id' => $season->id,
@@ -313,8 +385,8 @@ class OfficialFixtureImportService
             'source_external_id' => $fixture['external_id'],
             'home_team_id' => $home->id,
             'away_team_id' => $away->id,
-            'kickoff_at' => $kickoffAt,
-            'scheduled_date' => $fixture['scheduled_date'],
+            'kickoff_at' => $manualKickoff ? $match->kickoff_at : $kickoffAt,
+            'scheduled_date' => $manualKickoff ? $match->scheduled_date : $fixture['scheduled_date'],
             'kickoff_precision' => $precision,
             'kickoff_status' => $fixture['kickoff_status'] ?? $precision,
             'source_timezone' => $fixture['source_timezone'] ?? null,
@@ -324,11 +396,11 @@ class OfficialFixtureImportService
             'source_verified_at' => $sourceVerifiedAt,
             'source_hash' => $this->productionAudit->sourceHash($fixture),
             'verification_status' => $verified ? 'verified' : 'pending_verification',
-            'status' => MatchStatus::Scheduled,
+            'status' => $manualStatus ? $match->status : MatchStatus::Scheduled,
             'home_score' => null,
             'away_score' => null,
             'minute' => null,
-            'featured' => false,
+            'featured' => $manualFeatured ? $match->featured : false,
             'published_at' => $verified ? now() : null,
             'visibility' => $verified ? MatchVisibility::Public : MatchVisibility::Internal,
             'seo_title' => "{$home->name} vs {$away->name} - {$competition->name}",

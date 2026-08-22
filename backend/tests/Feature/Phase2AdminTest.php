@@ -154,6 +154,33 @@ it('persists a manual feature choice across future fixture syncs', function (): 
     expect($match->fresh()->hasManualOverride('featured'))->toBeTrue();
 });
 
+it('persists and restores manual kickoff overrides from match control', function (): void {
+    Sanctum::actingAs(ownerUser());
+    $match = GameMatch::factory()->create([
+        'kickoff_at' => Carbon::parse('2026-08-22 18:30:00', 'UTC'),
+        'scheduled_date' => '2026-08-22',
+        'kickoff_precision' => 'confirmed',
+        'kickoff_status' => 'confirmed',
+    ]);
+
+    $this->patchJson("/api/v1/admin/matches/{$match->id}/control/kickoff", [
+        'kickoff_at' => '2026-08-22T22:00',
+        'timezone' => 'Africa/Casablanca',
+        'reason' => 'Broadcaster correction',
+    ])->assertOk()
+        ->assertJsonPath('data.match.manual_overrides.kickoff_at', true)
+        ->assertJsonPath('data.match.kickoff_status', 'admin_override');
+
+    $match->refresh();
+    expect($match->kickoff_at->toIso8601String())->toBe('2026-08-22T21:00:00+00:00')
+        ->and($match->hasManualOverride('kickoff_at'))->toBeTrue();
+
+    $this->postJson("/api/v1/admin/matches/{$match->id}/control/kickoff/restore-provider")
+        ->assertOk();
+
+    expect($match->fresh()->hasManualOverride('kickoff_at'))->toBeFalse();
+});
+
 it('updates live score and prevents invalid status transitions without override', function (): void {
     Sanctum::actingAs(ownerUser());
     $match = GameMatch::factory()->create(['status' => MatchStatus::Scheduled]);

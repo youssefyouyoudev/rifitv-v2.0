@@ -124,7 +124,7 @@ class MatchService
 
     private function payload(array $data, ?GameMatch $existing = null): array
     {
-        $timezone = (string) config('rifitv.display_timezone', 'Africa/Casablanca');
+        $timezone = (string) ($data['timezone'] ?? config('rifitv.display_timezone', 'Africa/Casablanca'));
         $kickoff = isset($data['kickoff_at']) ? Carbon::parse($data['kickoff_at'], $timezone) : $existing?->kickoff_at;
         $published = (bool) ($data['published'] ?? (bool) $existing?->published_at);
         $sourceProvider = $existing?->source_provider ?? 'manual-admin';
@@ -137,10 +137,18 @@ class MatchService
             data_set($manualOverrides, 'featured', true);
         }
 
+        if ($existing && array_key_exists('kickoff_at', $data)) {
+            data_set($manualOverrides, 'kickoff_at', true);
+        }
+
         if ($isManual && $published) {
             $verificationStatus = 'manual_verified';
             $sourceVerifiedAt ??= now();
         }
+
+        $kickoffStatus = array_key_exists('kickoff_at', $data)
+            ? ($existing ? 'admin_override' : 'confirmed')
+            : $existing?->kickoff_status;
 
         return [
             'competition_id' => $data['competition_id'] ?? $existing?->competition_id,
@@ -148,6 +156,9 @@ class MatchService
             'away_team_id' => $data['away_team_id'] ?? $existing?->away_team_id,
             'kickoff_at' => $kickoff?->utc(),
             'scheduled_date' => $kickoff?->toDateString() ?? $existing?->scheduled_date,
+            'kickoff_precision' => $kickoff ? 'confirmed' : $existing?->kickoff_precision,
+            'kickoff_status' => $kickoffStatus,
+            'source_timezone' => $kickoff ? $timezone : $existing?->source_timezone,
             'source_provider' => $sourceProvider,
             'source_external_id' => $existing?->source_external_id,
             'source_verified_at' => $sourceVerifiedAt,

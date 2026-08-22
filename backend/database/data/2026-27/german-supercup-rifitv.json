@@ -1,0 +1,31 @@
+{
+  "competition": "german-super-cup",
+  "season": "2026-27",
+  "retrieved_at": "2026-08-22T12:00:00Z",
+  "source": "https://www.bundesliga.com/en/bundesliga/news/franz-beckenbauer-supercup",
+  "fixtures": [
+    {
+      "competition": "german-super-cup",
+      "season": "2026-27",
+      "provider": "official-german-super-cup",
+      "external_id": "german-super-cup-2026-borussia-dortmund-bayern-munich",
+      "matchday": 1,
+      "round_label": "Franz Beckenbauer Supercup",
+      "home_team": "Borussia Dortmund",
+      "away_team": "Bayern Munich",
+      "scheduled_date": "2026-08-22",
+      "kickoff_local": "20:30",
+      "source_timezone": "Europe/Berlin",
+      "kickoff_status": "confirmed",
+      "status": "scheduled",
+      "source_reference": "https://www.bundesliga.com/en/bundesliga/news/franz-beckenbauer-supercup",
+      "broadcast": {
+        "network": "MBC Action",
+        "territory": "MENA / Arabic",
+        "status": "network_confirmed",
+        "specific_channel": "MBC Action",
+        "streaming_platform": null
+      }
+    }
+  ]
+}

@@ -75,6 +75,8 @@ Route::prefix('v1')->group(function (): void {
             Route::delete('matches/{match}/control/channels/{channel}', [AdminMatchControlController::class, 'removeChannel']);
             Route::post('matches/{match}/control/channels/{channel}/promote', [AdminMatchControlController::class, 'promoteChannel']);
             Route::post('matches/{match}/control/playback', [AdminMatchControlController::class, 'playback']);
+            Route::patch('matches/{match}/control/kickoff', [AdminMatchControlController::class, 'kickoff']);
+            Route::post('matches/{match}/control/kickoff/restore-provider', [AdminMatchControlController::class, 'restoreProviderKickoff']);
             Route::patch('matches/{match}/control/score', [AdminMatchControlController::class, 'score']);
             Route::patch('matches/{match}/control/status', [AdminMatchControlController::class, 'status']);
             Route::patch('matches/{match}/control/feature', [AdminMatchControlController::class, 'feature']);
