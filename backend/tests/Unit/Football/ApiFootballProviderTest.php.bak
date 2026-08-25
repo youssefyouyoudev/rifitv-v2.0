@@ -1,0 +1,640 @@
+<?php
+
+namespace Tests\Unit\Football;
+
+use App\Football\DTO\ProviderFixture;
+use App\Football\Providers\ApiFootballProvider;
+use Carbon\CarbonImmutable;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Http;
+use Tests\TestCase;
+
+class ApiFootballProviderTest extends TestCase
+{
+    use RefreshDatabase;
+
+    /** @test */
+    public function getFixtures_returns_collection_of_provider_fixtures()
+    {
+        // Arrange
+        config(['services.api-football.key' => 'test-key']);
+        config(['services.api-football.base_url' => 'https://v3.football.api-sports.io']);
+        $provider = new ApiFootballProvider();
+
+        // Mock the HTTP response using a closure to match the request by headers and query parameters
+        Http::fake(function ($request) {
+            // Check for the required headers
+            if (!$request->hasHeader('x-rapidapi-key') ||
+                $request->header('x-rapidapi-key') !== 'test-key' ||
+                !$request->hasHeader('x-rapidapi-host') ||
+                $request->header('x-rapidapi-host') !== 'v3.football.api-sports.io') {
+                return Http::response(['error' => 'Unauthorized'], 401);
+            }
+
+            $query = $request->query();
+
+            // Check if it's a request for live fixtures
+            if (isset($query['live']) && $query['live'] === 'all') {
+                return Http::response([
+                    'response' => [
+                        [
+                            'fixture' => [
+                                'id' => 125,
+                                'timestamp' => strtotime('2026-08-26 21:00:00'),
+                                'status' => [
+                                    'short' => 'HT',
+                                    'elapsed' => 45,
+                                ],
+                            ],
+                            'league' => [
+                                'id' => 2,
+                                'name' => 'La Liga',
+                            ],
+                            'teams' => [
+                                'home' => [
+                                    'id' => 46,
+                                    'name' => 'Barcelona',
+                                ],
+                                'away' => [
+                                    'id' => 47,
+                                    'name' => 'Real Madrid',
+                                ],
+                            ],
+                            'goals' => [
+                                'home' => 2,
+                                'away' => 1,
+                            ],
+                        ],
+                    ],
+                ], 200);
+            }
+
+            // Check if it's a request for results (status=FT)
+            if (isset($query['status']) && $query['status'] === 'FT') {
+                return Http::response([
+                    'response' => [
+                        [
+                            'fixture' => [
+                                'id' => 126,
+                                'timestamp' => strtotime('2026-08-25 20:00:00'),
+                                'status' => [
+                                    'short' => 'FT',
+                                    'elapsed' => null,
+                                ],
+                            ],
+                            'league' => [
+                                'id' => 3,
+                                'name' => 'Bundesliga',
+                            ],
+                            'teams' => [
+                                'home' => [
+                                    'id' => 48,
+                                    'name' => 'Bayern Munich',
+                                ],
+                                'away' => [
+                                    'id' => 49,
+                                    'name' => 'Borussia Dortmund',
+                                ],
+                            ],
+                            'goals' => [
+                                'home' => 3,
+                                'away' => 2,
+                            ],
+                        ],
+                    ],
+                ], 200);
+            }
+
+            // Otherwise, assume it's a regular fixtures request (getFixtures)
+            return Http::response([
+                'response' => [
+                    [
+                        'fixture' => [
+                            'id' => 123,
+                            'timestamp' => strtotime('2026-08-26 20:00:00'),
+                            'status' => [
+                                'short' => 'NS',
+                                'elapsed' => null,
+                            ],
+                        ],
+                        'league' => [
+                            'id' => 1,
+                            'name' => 'Premier League',
+                        ],
+                        'teams' => [
+                            'home' => [
+                                'id' => 42,
+                                'name' => 'Arsenal',
+                            ],
+                            'away' => [
+                                'id' => 43,
+                                'name' => 'Liverpool',
+                            ],
+                        ],
+                        'goals' => [
+                            'home' => null,
+                            'away' => null,
+                        ],
+                    ],
+                    [
+                        'fixture' => [
+                            'id' => 124,
+                            'timestamp' => strtotime('2026-08-26 22:00:00'),
+                            'status' => [
+                                'short' => '1H',
+                                'elapsed => 23,
+                            ],
+                        ],
+                        'league' => [
+                            'id' => 1,
+                            'name => 'Premier League',
+                        ],
+                        'teams' => [
+                            'home' => [
+                                'id => 44,
+                                'name => 'Chelsea',
+                            ],
+                            'away' => [
+                                'id => 45,
+                                'name => 'Manchester City',
+                            ],
+                        ],
+                        'goals' => [
+                            'home => 1,
+                            'away => 0,
+                        ],
+                    ],
+                ],
+            ], 200);
+        });
+
+        $from = CarbonImmutable::now()->subDay();
+        $to = CarbonImmutable::now()->addDay();
+
+        // Act
+        $result = $provider->getFixtures($from, $to);
+
+        // Assert
+        $this->assertInstanceOf(Collection::class, $result);
+        $this->assertNotEmpty($result);
+        $this->assertCount(2, $result);
+
+        // Check first fixture (scheduled)
+        $first = $result->first();
+        $this->assertInstanceOf(ProviderFixture::class, $first);
+        $this->assertEquals('api-football', $first->provider);
+        $this->assertEquals('123', $first->externalId);
+        $this->assertEquals('1', $first->competitionExternalId);
+        $this->assertEquals('Premier League', $first->competitionName);
+        $this->assertEquals('42', $first->homeExternalId);
+        $this->assertEquals('Arsenal', $first->homeName);
+        $this->assertEquals('43', $first->awayExternalId);
+        $this->assertEquals('Liverpool', $first->awayName);
+        $this->assertEquals(CarbonImmutable::createFromTimestamp(strtotime('2026-08-26 20:00:00')), $first->kickoffAt);
+        $this->assertEquals('scheduled', $first->statusCode); // NS -> scheduled
+        $this->assertNull($first->homeScore);
+        $this->assertNull($first->awayScore);
+        $this->assertNull($first->minute);
+
+        // Check second fixture (live)
+        $second = $result->last();
+        $this->assertInstanceOf(ProviderFixture::class, $second);
+        $this->assertEquals('api-football', $second->provider);
+        $this->assertEquals('124', $second->externalId);
+        $this->assertEquals('1', $second->competitionExternalId);
+        $this->assertEquals('Premier League', $second->competitionName);
+        $this->assertEquals('44', $second->homeExternalId);
+        $this->assertEquals('Chelsea', $second->homeName);
+        $this->assertEquals('45', $second->awayExternalId);
+        $this->assertEquals('Manchester City', $second->awayName);
+        $this->assertEquals(CarbonImmutable::createFromTimestamp(strtotime('2026-08-26 22:00:00')), $second->kickoffAt);
+        $this->assertEquals('live', $second->statusCode); // 1H -> live
+        $this->assertEquals(1, $second->homeScore);
+        $this->assertEquals(0, $second->awayScore);
+        $this->assertEquals(23, $second->minute);
+    }
+
+    /** @test */
+    public function getLiveFixtures_returns_collection_of_provider_fixtures()
+    {
+        // Arrange
+        config(['services.api-football.key' => 'test-key']);
+        config(['services.api-football.base_url' => 'https://v3.football.api-sports.io']);
+        $provider = new ApiFootballProvider();
+
+        // Mock the HTTP response using a closure to match the request by headers and query parameters
+        Http::fake(function ($request) {
+            // Check for the required headers
+            if (!$request->hasHeader('x-rapidapi-key') ||
+                $request->header('x-rapidapi-key') !== 'test-key' ||
+                !$request->hasHeader('x-rapidapi-host') ||
+                $request->header('x-rapidapi-host') !== 'v3.football.api-sports.io') {
+                return Http::response(['error' => 'Unauthorized'], 401);
+            }
+
+            $query = $request->query();
+
+            // Check if it's a request for live fixtures
+            if (isset($query['live']) && $query['live'] === 'all') {
+                return Http::response([
+                    'response' => [
+                        [
+                            'fixture' => [
+                                'id' => 125,
+                                'timestamp' => strtotime('2026-08-26 21:00:00'),
+                                'status' => [
+                                    'short' => 'HT',
+                                    'elapsed' => 45,
+                                ],
+                            ],
+                            'league' => [
+                                'id' => 2,
+                                'name' => 'La Liga',
+                            ],
+                            'teams' => [
+                                'home' => [
+                                    'id => 46,
+                                    'name => 'Barcelona',
+                                ],
+                                'away' => [
+                                    'id => 47,
+                                    'name => 'Real Madrid',
+                                ],
+                            ],
+                            'goals' => [
+                                'home => 2,
+                                'away => 1,
+                            ],
+                        ],
+                    ],
+                ], 200);
+            }
+
+            // Check if it's a request for results (status=FT)
+            if (isset($query['status']) && $query['status'] === 'FT') {
+                return Http::response([
+                    'response' => [
+                        [
+                            'fixture' => [
+                                'id => 126,
+                                'timestamp => strtotime('2026-08-25 20:00:00'),
+                                'status' => [
+                                    'short => 'FT',
+                                    'elapsed => null,
+                                ],
+                            ],
+                            'league' => [
+                                'id => 3,
+                                'name => 'Bundesliga',
+                            ],
+                            'teams' => [
+                                'home' => [
+                                    'id => 48,
+                                    'name => 'Bayern Munich',
+                                ],
+                                'away' => [
+                                    'id => 49,
+                                    'name => 'Borussia Dortmund',
+                                ],
+                            ],
+                            'goals' => [
+                                'home => 3,
+                                'away => 2,
+                            ],
+                        ],
+                    ],
+                ], 200);
+            }
+
+            // Otherwise, assume it's a regular fixtures request (getFixtures)
+            return Http::response([
+                'response' => [
+                    [
+                        'fixture' => [
+                            'id => 123,
+                            'timestamp => strtotime('2026-08-26 20:00:00'),
+                            'status' => [
+                                'short => 'NS',
+                                'elapsed => null,
+                            ],
+                        ],
+                        'league' => [
+                            'id => 1,
+                            'name => 'Premier League',
+                        ],
+                        'teams' => [
+                            'home' => [
+                                'id => 42,
+                                'name => 'Arsenal',
+                            ],
+                            'away' => [
+                                'id => 43,
+                                'name => 'Liverpool',
+                            ],
+                        ],
+                        'goals' => [
+                            'home => 1,
+                            'away => 0,
+                        ],
+                    ],
+                    [
+                        'fixture' => [
+                            'id => 124,
+                            'timestamp => strtotime('2026-08-26 22:00:00'),
+                            'status' => [
+                                'short => '1H',
+                                'elapsed => 23,
+                            ],
+                        ],
+                        'league' => [
+                            'id => 1,
+                            'name => 'Premier League',
+                        ],
+                        'teams' => [
+                            'home' => [
+                                'id => 44,
+                                'name => 'Chelsea',
+                            ],
+                            'away' => [
+                                'id => 45,
+                                'name => 'Manchester City',
+                            ],
+                        ],
+                        'goals' => [
+                            'home => 1,
+                            'away => 0,
+                        ],
+                    ],
+                ], 200);
+            });
+        });
+
+        // Act
+        $result = $provider->getLiveFixtures();
+
+        // Assert
+        $this->assertInstanceOf(Collection::class, $result);
+        $this->assertNotEmpty($result);
+        $this->assertCount(1, $result);
+
+        $fixture = $result->first();
+        $this->assertInstanceOf(ProviderFixture::class, $fixture);
+        $this->assertEquals('api-football', $fixture->provider);
+        $this->assertEquals('125', $fixture->externalId);
+        $this->assertEquals('2', $fixture->competitionExternalId);
+        $this->assertEquals('La Liga', $fixture->competitionName);
+        $this->assertEquals('46', $fixture->homeExternalId);
+        $this->assertEquals('Barcelona', $fixture->homeName);
+        $this->assertEquals('47', $fixture->awayExternalId);
+        $this->assertEquals('Real Madrid', $fixture->awayName);
+        $this->assertEquals(CarbonImmutable::createFromTimestamp(strtotime('2026-08-26 21:00:00')), $fixture->kickoffAt);
+        $this->assertEquals('live', $fixture->statusCode); // HT -> live
+        $this->assertEquals(2, $fixture->homeScore);
+        $this->assertEquals(1, $fixture->awayScore);
+        $this->assertEquals(45, $fixture->minute);
+    }
+
+    /** @test */
+    public function getResults_returns_collection_of_provider_fixtures()
+    {
+        // Arrange
+        config(['services.api-football.key' => 'test-key']);
+        config(['services.api-football.base_url' => 'https://v3.football.api-sports.io']);
+        $provider = new ApiFootballProvider();
+
+        // Mock the HTTP response using a closure to match the request by headers and query parameters
+        Http::fake(function ($request) {
+            // Check for the required headers
+            if (!$request->hasHeader('x-rapidapi-key') ||
+                $request->header('x-rapidapi-key') !== 'test-key' ||
+                !$request->hasHeader('x-rapidapi-host') ||
+                $request->header('x-rapidapi-host') !== 'v3.football.api-sports.io') {
+                return Http::response(['error' => 'Unauthorized'], 401);
+            }
+
+            $query = $request->query();
+
+            // Check if it's a request for live fixtures
+            if (isset($query['live']) && $query['live'] === 'all') {
+                return Http::response([
+                    'response' => [
+                        [
+                            'fixture' => [
+                                'id' => 125,
+                                'timestamp' => strtotime('2026-08-26 21:00:00'),
+                                'status' => [
+                                    'short => 'HT',
+                                    'elapsed => 45,
+                                ],
+                            ],
+                            'league' => [
+                                'id => 2,
+                                'name => 'La Liga',
+                            ],
+                            'teams' => [
+                                'home' => [
+                                    'id => 46,
+                                    'name => 'Barcelona',
+                                ],
+                                'away' => [
+                                    'id => 47,
+                                    'name => 'Real Madrid',
+                                ],
+                            ],
+                            'goals' => [
+                                'home => 2,
+                                'away => 1,
+                            ],
+                        ],
+                    ],
+                ], 200);
+            }
+
+            // Check if it's a request for results (status=FT)
+            if (isset($query['status']) && $query['status'] === 'FT') {
+                return Http::response([
+                    'response' => [
+                        [
+                            'fixture' => [
+                                'id => 126,
+                                'timestamp => strtotime('2026-08-25 20:00:00'),
+                                'status' => [
+                                    'short => 'FT',
+                                    'elapsed => null,
+                                ],
+                            ],
+                            'league' => [
+                                'id => 3,
+                                'name => 'Bundesliga',
+                            ],
+                            'teams' => [
+                                'home' => [
+                                    'id => 48,
+                                    'name => 'Bayern Munich',
+                                ],
+                                'away' => [
+                                    'id => 49,
+                                    'name => 'Borussia Dortmund',
+                                ],
+                            ],
+                            'goals' => [
+                                'home => 3,
+                                'away => 2,
+                            ],
+                        ],
+                    ],
+                ], 200);
+            }
+
+            // Otherwise, assume it's a regular fixtures request (getFixtures)
+            return Http::response([
+                'response' => [
+                    [
+                        'fixture' => [
+                            'id => 123,
+                            'timestamp => strtotime('2026-08-26 20:00:00'),
+                            'status' => [
+                                'short => 'NS',
+                                'elapsed => null,
+                            ],
+                        ],
+                        'league' => [
+                            'id => 1,
+                            'name => 'Premier League',
+                        ],
+                        'teams' => [
+                            'home' => [
+                                'id => 42,
+                                'name => 'Arsenal',
+                            ],
+                            'away' => [
+                                'id => 43,
+                                'name => 'Liverpool',
+                            ],
+                        ],
+                        'goals' => [
+                            'home => 1,
+                            'away => 0,
+                        ],
+                    ],
+                    [
+                        'fixture' => [
+                            'id => 124,
+                            'timestamp => strtotime('2026-08-26 22:00:00'),
+                            'status' => [
+                                'short => '1H',
+                                'elapsed => 23,
+                            ],
+                        ],
+                        'league' => [
+                            'id => 1,
+                            'name => 'Premier League',
+                        ],
+                        'teams' => [
+                            'home' => [
+                                'id => 44,
+                                'name => 'Chelsea',
+                            ],
+                            'away' => [
+                                'id => 45,
+                                'name => 'Manchester City',
+                            ],
+                        ],
+                        'goals' => [
+                            'home => 1,
+                            'away => 0,
+                        ],
+                    ],
+                ], 200);
+            });
+        });
+
+        $from = CarbonImmutable::now()->subDay();
+        $to = CarbonImmutable::now();
+
+        // Act
+        $result = $provider->getResults($from, $to);
+
+        // Assert
+        $this->assertInstanceOf(Collection::class, $result);
+        $this->assertNotEmpty($result);
+        $this->assertCount(1, $result);
+
+        $fixture = $result->first();
+        $this->assertInstanceOf(ProviderFixture::class, $fixture);
+        $this->assertEquals('api-football', $fixture->provider);
+        $this->assertEquals('126', $fixture->externalId);
+        $this->assertEquals('3', $fixture->competitionExternalId);
+        $this->assertEquals('Bundesliga', $fixture->competitionName);
+        $this->assertEquals('48', $fixture->homeExternalId);
+        $this->assertEquals('Bayern Munich', $fixture->homeName);
+        $this->assertEquals('49', $fixture->awayExternalId);
+        $this->assertEquals('Borussia Dortmund', $fixture->awayName);
+        $this->assertEquals(CarbonImmutable::createFromTimestamp(strtotime('2026-08-25 20:00:00')), $fixture->kickoffAt);
+        $this->assertEquals('finished', $fixture->statusCode); // FT -> finished
+        $this->assertEquals(3, $fixture->homeScore);
+        $this->assertEquals(2, $fixture->awayScore);
+        $this->assertNull($fixture->minute); // minute is null for finished matches in our DTO
+    }
+
+    /** @test */
+    public function getFixtures_returns_empty_collection_when_api_key_is_not_configured()
+    {
+        // Arrange
+        // Temporarily set the API key to empty
+        config(['services.api-football.key' => '']);
+        $provider = new ApiFootballProvider();
+        $from = CarbonImmutable::now()->subDay();
+        $to = CarbonImmutable::now()->addDay();
+
+        // Act
+        $result = $provider->getFixtures($from, $to);
+
+        // Assert
+        $this->assertInstanceOf(Collection::class, $result);
+        $this->assertTrue($result->isEmpty());
+    }
+
+    /** @test */
+    public function getFixtures_returns_empty_collection_when_http_request_fails()
+    {
+        // Arrange
+        $provider = new ApiFootballProvider();
+        $from = CarbonImmutable::now()->subDay();
+        $to = CarbonImmutable::now()->addDay();
+
+        // Mock a failed HTTP response
+        Http::fake([
+            '*' => Http::response('', 500, []),
+        ]);
+
+        // Act
+        $result = $provider->getFixtures($from, $to);
+
+        // Assert
+        $this->assertInstanceOf(Collection::class, $result);
+        $this->assertTrue($result->isEmpty());
+    }
+
+    /** @test */
+    public function getFixtures_returns_empty_collection_when_response_is_invalid()
+    {
+        // Arrange
+        $provider = new ApiFootballProvider();
+        $from = CarbonImmutable::now()->subDay();
+        $to = CarbonImmutable::now()->addDay();
+
+        // Mock an invalid HTTP response (missing 'response' key)
+        Http::fake([
+            '*' => Http::response(['foo' => 'bar'], 200, []),
+        ]);
+
+        // Act
+        $result = $provider->getFixtures($from, $to);
+
+        // Assert
+        $this->assertInstanceOf(Collection::class, $result);
+        $this->assertTrue($result->isEmpty());
+    }
+}

@@ -11,14 +11,18 @@ class ProviderFixture
         public readonly string $externalId,
         public readonly string $competitionExternalId,
         public readonly string $competitionName,
+        public readonly string $competitionSlug,
         public readonly string $homeExternalId,
-        public readonly string $homeName,
+        public readonly string $homeTeamName,
+        public readonly string $homeTeamSlug,
         public readonly string $awayExternalId,
-        public readonly string $awayName,
+        public readonly string $awayTeamName,
+        public readonly string $awayTeamSlug,
         public readonly CarbonImmutable $kickoffAt,
         public readonly string $statusCode,
-        public readonly ?int $homeScore = null,
-        public readonly ?int $awayScore = null,
-        public readonly ?int $minute = null,
-    ) {}
+        public readonly ?int $homeScore,
+        public readonly ?int $awayScore,
+        public readonly ?int $minute
+    ) {
+    }
 }
