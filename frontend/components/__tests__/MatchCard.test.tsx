@@ -63,4 +63,30 @@ describe("MatchCard", () => {
     expect(screen.getByText("Final")).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
   });
+
+  it("renders postponed matches", () => {
+    render(<MatchCard match={{ ...baseMatch, status: "postponed", home_score: null, away_score: null, playback_window: { ...baseMatch.playback_window, status: "open", seconds_until_open: null, seconds_until_kickoff: null }, channels: [] }} />);
+
+    // Get the CTA element (which is in the footer)
+    const cta = screen.getByText(/Details/i);
+    // The footer is the parent of the CTA
+    const footer = cta.parentElement as HTMLElement;
+    // The first child of the footer is the div that contains the status and channels
+    const statusAndChannelsDiv = footer.firstElementChild as HTMLElement;
+    expect(statusAndChannelsDiv.textContent).toContain("Postponed");
+    expect(screen.getByText(/Details/i)).toBeInTheDocument();
+  });
+
+  it("renders cancelled matches", () => {
+    render(<MatchCard match={{ ...baseMatch, status: "cancelled", home_score: null, away_score: null, playback_window: { ...baseMatch.playback_window, status: "open", seconds_until_open: null, seconds_until_kickoff: null }, channels: [] }} />);
+
+    // Get the CTA element (which is in the footer)
+    const cta = screen.getByText(/Details/i);
+    // The footer is the parent of the CTA
+    const footer = cta.parentElement as HTMLElement;
+    // The first child of the footer is the div that contains the status and channels
+    const statusAndChannelsDiv = footer.firstElementChild as HTMLElement;
+    expect(statusAndChannelsDiv.textContent).toContain("Cancelled");
+    expect(screen.getByText(/Details/i)).toBeInTheDocument();
+  });
 });
