@@ -162,29 +162,55 @@ async function MatchLinks({ match }: { match: Match }) {
 }
 
 function PrematchPanel({ match, playback }: { match: Match; playback: PlaybackPayload }) {
-  const status = playback.status;
-  const title = match.status === "finished" || status === "ended"
+  // Use state from API if available, otherwise fall back to direct match properties
+  const state = match.state as {
+    isLive: boolean;
+    isFinished: boolean;
+    isPostponed: boolean;
+    isCancelled: boolean;
+    playbackStatus: string;
+    isWatchable: boolean;
+    displayStatus: string;
+    title: string;
+    subtitle: string;
+    eventStatus: string;
+    countdownSeconds: number | null;
+    countdownLabel: string;
+  } | null;
+
+  const title = state?.title ?? (match.status === "finished" || playback.status === "ended"
     ? "Broadcast ended"
     : match.status === "postponed"
       ? "Postponed"
       : match.status === "cancelled"
         ? "Cancelled"
-        : status === "tbc"
+        : playback.status === "tbc"
           ? "Kickoff time will be announced"
-          : status === "unavailable"
+          : playback.status === "unavailable"
             ? "Broadcast unavailable"
-            : "Stream available soon";
-  const subtitle = status === "tbc"
+            : "Stream available soon");
+  const subtitle = state?.subtitle ?? (playback.status === "tbc"
     ? "Broadcast access will become available when the kickoff time is confirmed."
-    : status === "unavailable"
+    : playback.status === "unavailable"
       ? "No authorized broadcast sources are currently available for this match. Please check back closer to kickoff time."
-      : status === "ended"
+      : playback.status === "ended"
         ? "This broadcast window has closed."
         : match.status === "postponed"
           ? "The match has been postponed. Please check back for the new schedule."
           : match.status === "cancelled"
             ? "The match has been cancelled."
-            : `Kickoff - ${formatClockTime(match.kickoff_at)}`;
+            : `Kickoff - ${formatClockTime(match.kickoff_at)}`);
+
+  // Determine countdown seconds and label (use state if available)
+  let countdownSeconds: number | null = state?.countdownSeconds ?? null;
+  let countdownLabel: string = state?.countdownLabel ?? "";
+  if (countdownSeconds === null && (playback.status === "locked" || playback.status === "opening_soon")) {
+    countdownSeconds = playback.window.seconds_until_open;
+    countdownLabel = "Stream available in";
+  } else if (countdownSeconds === null) {
+    countdownSeconds = playback.window.seconds_until_kickoff;
+    countdownLabel = "Match starts in";
+  }
 
   return (
     <div className="grid min-h-72 place-items-center rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5 text-center sm:min-h-[420px] sm:p-6">
@@ -202,13 +228,13 @@ function PrematchPanel({ match, playback }: { match: Match; playback: PlaybackPa
           <h2 className="text-2xl font-bold text-[var(--foreground)]">{title}</h2>
           <p className="mt-2 text-sm text-[var(--muted)]">{subtitle}</p>
         </div>
-        {status === "locked" || status === "opening_soon" ? (
+        {playback.status === "locked" || playback.status === "opening_soon" ? (
           <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4">
-            <Countdown seconds={playback.window.seconds_until_open} label="Stream available in" />
+            <Countdown seconds={countdownSeconds} label={countdownLabel} />
           </div>
-        ) : status === "open" ? (
+        ) : playback.status === "open" ? (
           <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4">
-            <Countdown seconds={playback.window.seconds_until_kickoff} label="Match starts in" />
+            <Countdown seconds={countdownSeconds} label={countdownLabel} />
           </div>
         ) : null}
       </div>

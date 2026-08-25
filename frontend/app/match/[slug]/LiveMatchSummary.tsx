@@ -17,11 +17,11 @@ export function LiveMatchSummary({ initialMatch }: { initialMatch: Match }) {
     let latest = initialMatch;
 
     const schedule = (): void => {
-      if (disposed || isTerminal(latest.status)) {
+      if (disposed || isTerminal(latest)) {
         return;
       }
 
-      const delay = document.visibilityState === "hidden" ? 60000 : isLive(latest.status) ? 10000 : 30000;
+      const delay = document.visibilityState === "hidden" ? 60000 : isLive(latest) ? 10000 : 30000;
       timer = window.setTimeout(() => void refresh(), delay);
     };
 
@@ -65,6 +65,22 @@ export function LiveMatchSummary({ initialMatch }: { initialMatch: Match }) {
     };
   }, [initialMatch]);
 
+  // Use state from API if available, otherwise fall back to direct match properties
+  const state = match.state as {
+    isLive: boolean;
+    isFinished: boolean;
+    isPostponed: boolean;
+    isCancelled: boolean;
+    playbackStatus: string;
+    isWatchable: boolean;
+    displayStatus: string;
+    title: string;
+    subtitle: string;
+    eventStatus: string;
+    countdownSeconds: number | null;
+    countdownLabel: string;
+  } | null;
+
   return (
     <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
       <div className="flex items-center justify-between gap-3">
@@ -72,27 +88,35 @@ export function LiveMatchSummary({ initialMatch }: { initialMatch: Match }) {
           <p className="text-sm text-[var(--muted)]">{match.competition.name}</p>
           <h2 className="mt-1 text-xl font-bold text-[var(--foreground)]">{match.home_team.name} vs {match.away_team.name}</h2>
         </div>
-        <StatusBadge status={match.status} />
+        <StatusBadge status={state?.displayStatus ?? match.status} />
       </div>
 
       <div className="mt-5 space-y-4">
-        <TeamBlock team={match.home_team} score={match.home_score} showScore={match.status === "live" || match.status === "halftime" || match.status === "finished"} />
+        <TeamBlock team={match.home_team} score={match.home_score} showScore={state?.isLive ?? state?.isFinished ?? false} />
         <div className="flex items-center justify-between border-y border-[var(--border)] py-3 text-sm text-[var(--muted)]">
           <span>{match.minute ? `${match.minute}'` : formatMatchDateLabel(match)}</span>
           <span className="font-semibold uppercase">VS</span>
         </div>
-        <TeamBlock team={match.away_team} score={match.away_score} showScore={match.status === "live" || match.status === "halftime" || match.status === "finished"} />
+        <TeamBlock team={match.away_team} score={match.away_score} showScore={state?.isLive ?? state?.isFinished ?? false} />
       </div>
     </div>
   );
 }
 
-function isLive(status: Match["status"]): boolean {
-  return status === "live" || status === "halftime";
+function isLive(matchOrState: Match | { isLive: boolean; isFinished: boolean }): boolean {
+  // Handle both Match object and state object
+  if ('status' in matchOrState) {
+    return matchOrState.status === "live" || matchOrState.status === "halftime";
+  }
+  return matchOrState.isLive;
 }
 
-function isTerminal(status: Match["status"]): boolean {
-  return status === "finished" || status === "cancelled";
+function isTerminal(matchOrState: Match | { isFinished: boolean; isCancelled: boolean }): boolean {
+  // Handle both Match object and state object
+  if ('status' in matchOrState) {
+    return matchOrState.status === "finished" || matchOrState.status === "cancelled";
+  }
+  return matchOrState.isFinished || matchOrState.isCancelled;
 }
 
 function TeamBlock({ team, score, showScore }: { team: Match["home_team"]; score: number | null; showScore: boolean }) {
