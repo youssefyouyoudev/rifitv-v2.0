@@ -70,7 +70,7 @@ class MatchStateService
         } elseif ($countdownSeconds !== null) {
             $displayStatus = $countdownLabel; // We'll show the countdown instead of a text status
         } else {
-            $displayStatus = \date('D, j M', strtotime($match->scheduled_date)); // Fallback to date
+            $displayStatus = date('D, j M', strtotime($match->scheduled_date)); // Fallback to date
         }
 
         // Compute title for the prematch panel
@@ -100,7 +100,7 @@ class MatchStateService
         } elseif ($isCancelled) {
             $subtitle = 'The match has been cancelled.';
         } else {
-            $subtitle = 'Kickoff - ' \date('g:i A', strtotime($match->kickoff_at));
+            $subtitle = 'Kickoff - ' . date('g:i A', strtotime($match->kickoff_at));
         }
 
         // Compute event status for JSON-LD
