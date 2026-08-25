@@ -165,18 +165,26 @@ function PrematchPanel({ match, playback }: { match: Match; playback: PlaybackPa
   const status = playback.status;
   const title = match.status === "finished" || status === "ended"
     ? "Broadcast ended"
-    : status === "tbc"
-      ? "Kickoff time will be announced"
-      : status === "unavailable"
-        ? "Broadcast unavailable"
-        : "Stream available soon";
+    : match.status === "postponed"
+      ? "Postponed"
+      : match.status === "cancelled"
+        ? "Cancelled"
+        : status === "tbc"
+          ? "Kickoff time will be announced"
+          : status === "unavailable"
+            ? "Broadcast unavailable"
+            : "Stream available soon";
   const subtitle = status === "tbc"
     ? "Broadcast access will become available when the kickoff time is confirmed."
     : status === "unavailable"
       ? "No authorized broadcast sources are currently available for this match. Please check back closer to kickoff time."
-    : status === "ended"
-      ? "This broadcast window has closed."
-      : `Kickoff - ${formatClockTime(match.kickoff_at)}`;
+      : status === "ended"
+        ? "This broadcast window has closed."
+        : match.status === "postponed"
+          ? "The match has been postponed. Please check back for the new schedule."
+          : match.status === "cancelled"
+            ? "The match has been cancelled."
+            : `Kickoff - ${formatClockTime(match.kickoff_at)}`;
 
   return (
     <div className="grid min-h-72 place-items-center rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5 text-center sm:min-h-[420px] sm:p-6">
