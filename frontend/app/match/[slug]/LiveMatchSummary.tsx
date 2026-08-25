@@ -88,7 +88,7 @@ export function LiveMatchSummary({ initialMatch }: { initialMatch: Match }) {
           <p className="text-sm text-[var(--muted)]">{match.competition.name}</p>
           <h2 className="mt-1 text-xl font-bold text-[var(--foreground)]">{match.home_team.name} vs {match.away_team.name}</h2>
         </div>
-        <StatusBadge status={state?.displayStatus ?? match.status} />
+        <StatusBadge status={match.status} />
       </div>
 
       <div className="mt-5 space-y-4">
