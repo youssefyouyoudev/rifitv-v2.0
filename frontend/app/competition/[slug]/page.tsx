@@ -5,6 +5,7 @@ import { JsonLd } from "@/components/JsonLd";
 import { getCompetition } from "@/lib/api";
 import { groupMatchesByDate, sortMatches } from "@/lib/matches";
 import { absoluteUrl, SITE_NAME } from "@/lib/site";
+import type { Match } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -28,8 +29,24 @@ export default async function CompetitionPage({ params }: PageProps<"/competitio
   const { slug } = await params;
   const competition = await getCompetition(slug);
   const matches = competition.matches ?? [];
-  const upcomingGroups = groupMatchesByDate(sortMatches(matches.filter((match) => match.status !== "finished")));
-  const resultGroups = groupMatchesByDate(sortMatches(matches.filter((match) => match.status === "finished")));
+
+  // Use state from API when available, otherwise fall back to direct match properties
+  const upcomingMatches = matches.filter(match => {
+    const state = match.state as {
+      isFinished: boolean;
+    } | null;
+    return !(state?.isFinished ?? match.status === "finished");
+  });
+
+  const resultMatches = matches.filter(match => {
+    const state = match.state as {
+      isFinished: boolean;
+    } | null;
+    return state?.isFinished ?? match.status === "finished";
+  });
+
+  const upcomingGroups = groupMatchesByDate(sortMatches(upcomingMatches));
+  const resultGroups = groupMatchesByDate(sortMatches(resultMatches));
 
   return (
     <AppShell>

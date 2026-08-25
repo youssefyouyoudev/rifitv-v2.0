@@ -7,49 +7,93 @@ import { TeamMark } from "./TeamMark";
 import { TrackedLink } from "./TrackedLink";
 
 export function MatchCard({ match, serverDate, featured = false }: { match: Match; serverDate?: string; featured?: boolean }) {
-  const live = isLiveStatus(match.status);
-  const finished = match.status === "finished";
-  const postponed = match.status === "postponed";
-  const cancelled = match.status === "cancelled";
-  const playbackStatus = match.playback_window.status;
-  const watchable = playbackStatus === "open" && match.channels.length > 0;
+  // Use state from API if available, otherwise fall back to direct match properties
+  const state = match.state as {
+    isLive: boolean;
+    isFinished: boolean;
+    isPostponed: boolean;
+    isCancelled: boolean;
+    playbackStatus: string;
+    isWatchable: boolean;
+    displayStatus: string;
+    title: string;
+    subtitle: string;
+    eventStatus: string;
+    countdownSeconds: number | null;
+    countdownLabel: string;
+  } | null;
+
+  const live = state?.isLive ?? isLiveStatus(match.status);
+  const finished = state?.isFinished ?? match.status === "finished";
+  const postponed = state?.isPostponed ?? match.status === "postponed";
+  const cancelled = state?.isCancelled ?? match.status === "cancelled";
+  const playbackStatus = state?.playbackStatus ?? match.playback_window.status;
+  const watchable = state?.isWatchable ?? (playbackStatus === "open" && match.channels.length > 0);
   const cta = watchable ? (live ? "Watch Live" : "Watch") : "Details";
 
-  // Determine countdown seconds and label (as in original)
-  let countdownSeconds: number | null = null;
-  let countdownLabel: string = "";
-  if (playbackStatus === "locked" || playbackStatus === "opening_soon") {
+  // Determine countdown seconds and label (use state if available)
+  let countdownSeconds: number | null = state?.countdownSeconds ?? null;
+  let countdownLabel: string = state?.countdownLabel ?? "";
+  if (countdownSeconds === null && (playbackStatus === "locked" || playbackStatus === "opening_soon")) {
     countdownSeconds = match.playback_window.seconds_until_open;
     countdownLabel = "Stream opens in";
-  } else {
+  } else if (countdownSeconds === null) {
     countdownSeconds = match.playback_window.seconds_until_kickoff;
     countdownLabel = "Starts in";
   }
 
   // Determine status content
   let statusContent: React.ReactNode = null;
-  if (live) {
-    statusContent = (
-      <span className="inline-flex items-center gap-2 font-semibold text-[var(--live)]">
-        <span className="h-2 w-2 rounded-full bg-[var(--live)]" />Live now
-      </span>
-    );
-  } else if (finished) {
-    statusContent = <span>Final</span>;
-  } else if (postponed) {
-    statusContent = <span>Postponed</span>;
-  } else if (cancelled) {
-    statusContent = <span>Cancelled</span>;
-  } else if (playbackStatus === "tbc") {
-    statusContent = <span>Kickoff time will be announced</span>;
-  } else if (playbackStatus === "ended") {
-    statusContent = <span>Broadcast ended</span>;
-  } else if (countdownSeconds !== null) {
-    statusContent = (
-      <Countdown seconds={countdownSeconds} label={countdownLabel} compact />
-    );
+  if (state) {
+    // Use state-derived content
+    if (state.isLive) {
+      statusContent = (
+        <span className="inline-flex items-center gap-2 font-semibold text-[var(--live)]">
+          <span className="h-2 w-2 rounded-full bg-[var(--live)]" />Live now
+        </span>
+      );
+    } else if (state.isFinished) {
+      statusContent = <span>Final</span>;
+    } else if (state.isPostponed) {
+      statusContent = <span>Postponed</span>;
+    } else if (state.isCancelled) {
+      statusContent = <span>Cancelled</span>;
+    } else if (state.playbackStatus === "tbc") {
+      statusContent = <span>Kickoff time will be announced</span>;
+    } else if (state.playbackStatus === "ended") {
+      statusContent = <span>Broadcast ended</span>;
+    } else if (state.countdownSeconds !== null) {
+      statusContent = (
+        <Countdown seconds={state.countdownSeconds} label={state.countdownLabel} compact />
+      );
+    } else {
+      statusContent = <span className="mt-0.5 block truncate text-xs">{formatMatchDateLabel(match, serverDate)}</span>;
+    }
   } else {
-    statusContent = <span className="mt-0.5 block truncate text-xs">{formatMatchDateLabel(match, serverDate)}</span>;
+    // Fallback to original logic (already handles postponed/cancelled)
+    if (live) {
+      statusContent = (
+        <span className="inline-flex items-center gap-2 font-semibold text-[var(--live)]">
+          <span className="h-2 w-2 rounded-full bg-[var(--live)]" />Live now
+        </span>
+      );
+    } else if (finished) {
+      statusContent = <span>Final</span>;
+    } else if (postponed) {
+      statusContent = <span>Postponed</span>;
+    } else if (cancelled) {
+      statusContent = <span>Cancelled</span>;
+    } else if (playbackStatus === "tbc") {
+      statusContent = <span>Kickoff time will be announced</span>;
+    } else if (playbackStatus === "ended") {
+      statusContent = <span>Broadcast ended</span>;
+    } else if (countdownSeconds !== null) {
+      statusContent = (
+        <Countdown seconds={countdownSeconds} label={countdownLabel} compact />
+      );
+    } else {
+      statusContent = <span className="mt-0.5 block truncate text-xs">{formatMatchDateLabel(match, serverDate)}</span>;
+    }
   }
 
   return (
