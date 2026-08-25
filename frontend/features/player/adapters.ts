@@ -1,11 +1,12 @@
 import type { PlaybackSource, StreamProtocol } from "@/lib/types";
 import { DEFAULT_MPEGTS_PROFILE, MPEGTS_PROFILES, playbackUrl } from "./config";
-import type { AdapterEvents, PlaybackAdapter, PlaybackIssue, QualityLevel } from "./types";
+import type { AdapterEvents, PlaybackAdapter, PlaybackIssue, PlaybackIssueKind, QualityLevel } from "./types";
 
-type HlsErrorData = {
-  fatal: boolean;
+type HlsEventData = {
+  fatal?: boolean;
   type?: string;
   details?: string;
+  level?: number;
 };
 
 type HlsInstance = {
@@ -13,7 +14,7 @@ type HlsInstance = {
   attachMedia(video: HTMLVideoElement): void;
   destroy(): void;
   recoverMediaError(): void;
-  on(event: string, callback: (event: string, data: HlsErrorData) => void): void;
+  on(event: string, callback: (event: string, data: HlsEventData) => void): void;
   levels: Array<{ height?: number; bitrate?: number }>;
   currentLevel: number;
   liveSyncPosition?: number | null;
@@ -21,7 +22,8 @@ type HlsInstance = {
 
 type HlsConstructor = {
   isSupported(): boolean;
-  Events: Record<"ERROR" | "MANIFEST_PARSED" | "LEVEL_LOADED", string>;
+  Events: Record<"ERROR" | "MANIFEST_PARSED" | "LEVEL_LOADED" | "LEVEL_SWITCHED", string>;
+  ErrorTypes: Record<"NETWORK_ERROR" | "MEDIA_ERROR", string>;
   new (config: Record<string, unknown>): HlsInstance;
 };
 
@@ -135,7 +137,7 @@ class HlsAdapter implements PlaybackAdapter {
       }
       this.events.onIssue({
         kind,
-        fatal: data.fatal,
+        fatal: data.fatal ?? true,
         message: data.details ?? "HLS playback error",
         detail: `${data.type ?? "unknown"}:${data.details ?? "unknown"}`,
       });

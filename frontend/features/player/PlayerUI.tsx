@@ -157,7 +157,8 @@ export function PlayerUI({ playback, title }: { playback: PlaybackPayload; title
           });
         }
       } catch (err) {
-        console.error(`${err.name}, ${err.message}`);
+        const message = err instanceof Error ? `${err.name}, ${err.message}` : String(err);
+        console.error(message);
       }
     };
 

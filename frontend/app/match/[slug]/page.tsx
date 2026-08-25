@@ -12,14 +12,12 @@ import Link from "next/link";
 import { permanentRedirect } from "next/navigation";
 import { LiveMatchSummary } from "./LiveMatchSummary";
 import { PreWatchAdGate } from "@/components/PreWatchAdGate";
-import { BroadcastPanel } from "./BroadcastPanel";
 import { SidebarAd } from "@/components/ads/SidebarAd";
 import { ShareButton } from "@/components/ShareButton";
 import { getMatch, getPlayback, getMatches } from "@/lib/api";
 import { formatClockTime, formatMatchDateLabel } from "@/lib/time";
 import { findRelatedMatches } from "@/lib/relatedMatches";
 import type { Match, PlaybackPayload } from "@/lib/types";
-import { useEffect, useState } from "react";
 
 export const dynamic = "force-dynamic";
 
@@ -48,102 +46,7 @@ export default async function MatchPage({ params }: PageProps<"/match/[slug]">) 
     permanentRedirect(`/match/${match.slug}`);
   }
 
-  const [playback, setPlayback] = useState<PlaybackPayload | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-    let timer: NodeJS.Timeout | null = null;
-
-    const fetchPlayback = async () => {
-      try {
-        const data = await getPlayback(slug);
-        if (isMounted) {
-          setPlayback(data);
-          setIsLoading(false);
-          setError(null);
-        }
-      } catch (err) {
-        if (isMounted) {
-          setError("Failed to load playback data");
-          setIsLoading(false);
-        }
-      }
-    };
-
-    const startPolling = () => {
-      fetchPlayback(); // initial fetch
-      timer = setInterval(fetchPlayback, 15000); // poll every 15 seconds
-    };
-
-    startPolling();
-
-    return () => {
-      isMounted = false;
-      if (timer) {
-        clearInterval(timer);
-      }
-    };
-  }, [slug]);
-
-  if (isLoading) {
-    return (
-      <AppShell>
-        <section className="min-h-[600px] flex items-center justify-center">
-          <div className="text-center">
-            <h2 className="text-xl font-semibold text-[var(--foreground)]">Loading...</h2>
-            <p className="mt-2 text-sm text-[var(--muted)]">Please wait while we load the match data.</p>
-          </div>
-        </section>
-      </AppShell>
-    );
-  }
-
-  if (error) {
-    return (
-      <AppShell>
-        <section className="min-h-[600px] flex items-center justify-center">
-          <div className="text-center">
-            <h2 className="text-xl font-semibold text-[var(--foreground)]">Error loading match data</h2>
-            <p className="mt-2 text-sm text-[var(--muted)]">
-              {error}
-            </p>
-            <button
-              onClick={() => window.location.reload()}
-              className="mt-4 inline-flex h-10 items-center justify-center rounded-md bg-[var(--brand-blue)] px-4 text-sm font-semibold text-white hover:bg-[var(--brand-blue)]/90"
-            >
-              Try again
-            </button>
-          </div>
-        </section>
-      </AppShell>
-    );
-  }
-
-  // Ensure we have playback data
-  if (!playback) {
-    return (
-      <AppShell>
-        <section className="min-h-[600px] flex items-center justify-center">
-          <div className="text-center">
-            <h2 className="text-xl font-semibold text-[var(--foreground)]">No playback data available</h2>
-            <p className="mt-2 text-sm text-[var(--muted)]">Please try again later.</p>
-          </div>
-        </section>
-      </AppShell>
-    );
-  }
-
-  const { match: matchData } = playback; // Note: playback contains match data inside it? Let's check the types.
-
-  // Actually, from the getPlayback function, it returns PlaybackPayload which includes the match?
-  // Looking at the lib/api.ts, getPlayback returns ApiEnvelope<PlaybackPayload>
-  // And PlaybackPayload is defined in lib/types.ts. We don't have the exact structure, but we know it has:
-  // status, sources, policy, is_live_event, match_slug, default_source_id, window, and broadcasts?
-  // We also see in the PlayerUI that it uses playback.match_slug, so we assume the match data is not inside playback.
-  // Therefore, we should use the match we fetched earlier.
-
+  const playback = await getPlayback(slug);
   const canPlay = playback.status === "open" && playback.sources.length > 0;
 
   return (

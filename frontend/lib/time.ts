@@ -36,7 +36,7 @@ const shortDateFormatter = new Intl.DateTimeFormat(displayLocale, {
 type MatchTime = {
   kickoff_at: string | null;
   scheduled_date: string | null;
-  kickoff_precision?: "confirmed" | "date_only" | "provisional" | "tbc";
+  kickoff_precision?: string;
 };
 
 export function formatKickoff(value: string): string {
@@ -117,4 +117,4 @@ export function isLiveStatus(status: string): boolean {
   return status === "live" || status === "halftime";
 }
 
-function dateKey(date: Date): string { return localDateKey(date); }
+function dateKey(date: Date | string): string { return localDateKey(date); }
