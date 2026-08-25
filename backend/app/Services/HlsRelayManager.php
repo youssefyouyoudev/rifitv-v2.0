@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\LiveIngest;
 use App\Models\StreamSource;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\ExecutableFinder;
@@ -19,6 +20,7 @@ class HlsRelayManager
      * not be defined in PHP-FPM when pcntl is unavailable.
      */
     private const SIGNAL_TERM = 15;
+
     private const SIGNAL_KILL = 9;
 
     public function ensure(StreamSource $source): LiveIngest
@@ -573,7 +575,7 @@ class HlsRelayManager
 
     protected function ffmpegPath(): ?string
     {
-        return (new ExecutableFinder())->find(
+        return (new ExecutableFinder)->find(
             (string) config(
                 'rifitv.stable_relay.ffmpeg_binary',
                 'ffmpeg'
@@ -664,7 +666,7 @@ class HlsRelayManager
         }
 
         try {
-            return \Illuminate\Support\Carbon::parse(
+            return Carbon::parse(
                 (string) $lastRestartAt
             )->lte(
                 now()->subSeconds($cooldown)
@@ -685,8 +687,7 @@ class HlsRelayManager
         }
 
         foreach (
-            new \DirectoryIterator($ingest->output_path)
-            as $file
+            new \DirectoryIterator($ingest->output_path) as $file
         ) {
             if (! $file->isFile()) {
                 continue;
@@ -905,8 +906,7 @@ class HlsRelayManager
         foreach (
             $this->relayPidsForOutputPath(
                 $ingest->output_path
-            )
-            as $pid
+            ) as $pid
         ) {
             if (
                 $trackedPid !== null
@@ -949,8 +949,7 @@ class HlsRelayManager
                 explode(
                     "\n",
                     $process->getOutput()
-                )
-                as $line
+                ) as $line
             ) {
                 $line = trim($line);
 
@@ -1040,7 +1039,6 @@ class HlsRelayManager
                     'command=',
                 ]);
             }
-
             $process->setTimeout(3);
             $process->run();
 

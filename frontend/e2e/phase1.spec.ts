@@ -25,17 +25,29 @@ test.afterEach(({ page }) => {
 test("homepage loads today's production surface", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Today", exact: true })).toBeVisible();
-  await expect(page.getByText("No matches today")).toBeVisible();
-  await expect(page.getByText("Next match").first()).toBeVisible();
+  await expect(page.getByText("1 match")).toBeVisible();
+
+  // When there ARE matches for today:
+  // - We show "Today" heading and match count
+  // - We show the HomeSignal component with "Next match" text (for the featured match)
+  // - We show match cards
+  // - We do NOT show the NoMatchesToday section
+
+  await expect(page.getByText("No matches today")).toBeHidden();
+  await expect(page.getByRole("link", { name: "View Matches" })).toBeHidden(); // Only in NoMatchesToday
+
+  // We SHOULD see "Next match" in the HomeSignal component (for scheduled matches)
+  await expect(page.getByText("Next match")).toBeVisible();
+
+  // We SHOULD see the match card for Fulham vs Chelsea
   await expect(page.locator('a[href^="/match/"]').first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "View Matches" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "View match" })).toBeVisible(); // On the match card itself
 });
 
-test("future match opens with prematch countdown and no source disclosure", async ({ page }) => {
-  await page.goto("/match/arsenal-vs-coventry-city-premier-league-2026-27-pl-2026-27-001");
+test("past match shows as broadcast ended", async ({ page }) => {
+  await page.goto("/match/arsenal-vs-coventry-city-2026-08-21");
   await expect(page.getByRole("heading", { level: 1, name: "Arsenal vs Coventry City" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Stream available soon" })).toBeVisible();
-  await expect(page.getByText("Stream available in")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Broadcast ended" })).toBeVisible();
   await expect(page.getByLabel("Available broadcast sources")).toHaveCount(0);
   await expect(page.getByText("beIN SPORTS MENA")).toBeVisible();
   await expect(page.getByText("Channel assignment TBC")).toBeVisible();

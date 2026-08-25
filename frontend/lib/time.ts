@@ -26,6 +26,13 @@ const dateFormatter = new Intl.DateTimeFormat(displayLocale, {
   timeZone: displayTimeZone,
 });
 
+const shortDateFormatter = new Intl.DateTimeFormat(displayLocale, {
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+  timeZone: displayTimeZone,
+});
+
 type MatchTime = {
   kickoff_at: string | null;
   scheduled_date: string | null;
@@ -33,7 +40,7 @@ type MatchTime = {
 };
 
 export function formatKickoff(value: string): string {
-  return displayFormatter.format(new Date(value));
+  return timeFormatter.format(new Date(value));
 }
 
 export function formatMatchKickoff(match: MatchTime): string {
@@ -46,7 +53,7 @@ export function formatMatchKickoff(match: MatchTime): string {
     return `${date} - Time TBC`;
   }
 
-  return "Date TBC";
+  return "Time TBC";
 }
 
 export function formatMatchDateLabel(match: MatchTime, serverDate?: string): string {
@@ -59,8 +66,23 @@ export function formatMatchDateLabel(match: MatchTime, serverDate?: string): str
 
   const matchDate = dateKey(new Date(source));
   const today = serverDate ?? dateKey(new Date());
-  const tomorrow = addDays(today, 1);
-  const prefix = matchDate === today ? "Today" : matchDate === tomorrow ? "Tomorrow" : shortDateFormatter.format(new Date(source));
+  const todayDateKey = typeof today === 'string' ? dateKey(today) : today;
+  const tomorrow = addDays(todayDateKey, 1);
+  const prefix = matchDate === todayDateKey ? "Today" : matchDate === tomorrow ? "Tomorrow" : shortDateFormatter.format(new Date(source));
+
+  // Debug logging - remove in production
+  if (process.env.NODE_ENV === 'test') {
+    console.log('DEBUG formatMatchDateLabel:');
+    console.log('  match:', match);
+    console.log('  serverDate:', serverDate);
+    console.log('  source:', source);
+    console.log('  matchDate:', matchDate);
+    console.log('  today:', today);
+    console.log('  todayDateKey:', todayDateKey);
+    console.log('  tomorrow:', tomorrow);
+    console.log('  prefix:', prefix);
+    console.log('  time:', time);
+  }
 
   return `${prefix} - ${time}`;
 }
@@ -94,12 +116,5 @@ export function formatCountdown(totalSeconds: number | null): string {
 export function isLiveStatus(status: string): boolean {
   return status === "live" || status === "halftime";
 }
-
-const shortDateFormatter = new Intl.DateTimeFormat(displayLocale, {
-  weekday: "short",
-  month: "short",
-  day: "numeric",
-  timeZone: displayTimeZone,
-});
 
 function dateKey(date: Date): string { return localDateKey(date); }

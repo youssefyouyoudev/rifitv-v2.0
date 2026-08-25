@@ -106,6 +106,7 @@ it('reuses one live relay for repeated ensure calls on the same source', functio
     $relay = new class extends HlsRelayManager
     {
         public int $launches = 0;
+
         private string $command = '';
 
         protected function ffmpegPath(): ?string
@@ -142,6 +143,7 @@ it('coalesces same-source relay starts into one tracked launch', function (): vo
     $relay = new class extends HlsRelayManager
     {
         public int $launches = 0;
+
         private string $command = '';
 
         protected function ffmpegPath(): ?string
@@ -201,6 +203,7 @@ it('terminates duplicate relays for the same output path and keeps the tracked p
     $relay = new class extends HlsRelayManager
     {
         public array $terminated = [];
+
         public string $command = '';
 
         protected function ffmpegPath(): ?string
@@ -252,8 +255,11 @@ it('restarts a stalled relay once and does not flap during cooldown', function (
     $relay = new class extends HlsRelayManager
     {
         public int $launches = 0;
+
         public array $terminated = [];
+
         public string $command = '';
+
         private int $pid = 424242;
 
         protected function ffmpegPath(): ?string

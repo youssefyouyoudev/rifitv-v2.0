@@ -104,8 +104,8 @@ class HlsAdapter implements PlaybackAdapter {
     this.hls = new Hls({
       liveSyncDurationCount: 3,
       liveMaxLatencyDurationCount: 8,
-      maxBufferLength: 30,
-      backBufferLength: 30,
+      maxBufferLength: 20, // Reduced for live streaming to lower latency
+      backBufferLength: 20, // Reduced for live streaming to lower latency
       maxBufferHole: 1,
       nudgeOffset: 0.2,
       nudgeMaxRetry: 5,
@@ -119,12 +119,22 @@ class HlsAdapter implements PlaybackAdapter {
       this.events.onReady();
       this.events.onQualities(this.qualities());
     });
+    this.hls.on(Hls.Events.LEVEL_SWITCHED, (_event, data) => {
+      // Log level switch for debugging adaptive bitrate
+      console.log(`HLS level switched to: ${data.level}`);
+    });
     this.hls.on(Hls.Events.ERROR, (_event, data) => {
       if (!data.fatal) {
         return;
       }
+      let kind: PlaybackIssueKind = "unknown";
+      if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+        kind = "network";
+      } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+        kind = "media";
+      }
       this.events.onIssue({
-        kind: data.type?.includes("MEDIA") ? "media" : "network",
+        kind,
         fatal: data.fatal,
         message: data.details ?? "HLS playback error",
         detail: `${data.type ?? "unknown"}:${data.details ?? "unknown"}`,

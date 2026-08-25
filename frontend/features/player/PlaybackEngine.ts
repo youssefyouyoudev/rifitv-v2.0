@@ -221,7 +221,17 @@ export class PlaybackEngine {
     }
 
     this.metrics.emit({ name: "recovery_attempted", source: this.currentSource, issue });
-    this.setState(navigator.onLine ? "recovering" : "offline", navigator.onLine ? "Reconnecting..." : "You appear to be offline.");
+
+    let message = "Reconnecting...";
+    if (issue.kind === "network") {
+      message = "Network issue, reconnecting...";
+    } else if (issue.kind === "media") {
+      message = "Media issue, recovering...";
+    } else if (issue.kind === "stall") {
+      message = "Playback stalled, recovering...";
+    }
+
+    this.setState(navigator.onLine ? "recovering" : "offline", navigator.onLine ? message : "You appear to be offline.");
     if (!navigator.onLine) {
       return;
     }

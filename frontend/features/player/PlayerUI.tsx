@@ -1,6 +1,6 @@
 "use client";
 
-import { Maximize, Pause, Play, RotateCcw, Volume2, VolumeX } from "lucide-react";
+import { Maximize, Pause, Play, RotateCcw, Volume2, VolumeX, MonitorPlay } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { API_BASE } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
@@ -21,6 +21,15 @@ export function PlayerUI({ playback, title }: { playback: PlaybackPayload; title
   const [muted, setMuted] = useState(true);
   const [qualities, setQualities] = useState<QualityLevel[]>([]);
   const [behindLive, setBehindLive] = useState(false);
+  const [isLandscape, setIsLandscape] = useState(false);
+  const [deviceCapabilities, setDeviceCapabilities] = useState<{
+    isMobile: boolean;
+    isTablet: boolean;
+    isDesktop: boolean;
+    supportsPictureInPicture: boolean;
+    supportsWakeLock: boolean;
+    supportsFullscreen: boolean;
+  } | null>(null);
   const config = useMemo(() => ({ ...playback.policy, is_live_event: playback.is_live_event }), [playback]);
 
   useEffect(() => {
@@ -69,6 +78,120 @@ export function PlayerUI({ playback, title }: { playback: PlaybackPayload; title
     };
   }, [config, playback.default_source_id, playback.match_slug, playback.sources]);
 
+  // Handle orientation changes
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleOrientationChange = () => {
+      setIsLandscape(window.matchMedia("(orientation: landscape)").matches);
+    };
+
+    // Set initial state
+    handleOrientationChange();
+
+    // Listen for changes
+    window.addEventListener("resize", handleOrientationChange);
+    window.matchMedia("(orientation: landscape)").addEventListener("change", handleOrientationChange);
+
+    return () => {
+      window.removeEventListener("resize", handleOrientationChange);
+      window.matchMedia("(orientation: landscape)").removeEventListener("change", handleOrientationChange);
+    };
+  }, []);
+
+  // Detect device capabilities
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const detectCapabilities = () => {
+      const width = window.innerWidth;
+      const isMobile = width < 768;
+      const isTablet = width >= 768 && width < 1200;
+      const isDesktop = width >= 1200;
+
+      const supportsPictureInPicture = !!(
+        document.pictureInPictureEnabled ||
+        (document as any).webkitCurrentFullScreenElement
+      );
+
+      const supportsWakeLock = 'wakeLock' in navigator;
+      const supportsFullscreen = !!(
+        document.documentElement.requestFullscreen ||
+        (document.documentElement as any).webkitRequestFullscreen
+      );
+
+      setDeviceCapabilities({
+        isMobile,
+        isTablet,
+        isDesktop,
+        supportsPictureInPicture,
+        supportsWakeLock,
+        supportsFullscreen
+      });
+    };
+
+    // Detect initial capabilities
+    detectCapabilities();
+
+    // Listen for resize events
+    window.addEventListener('resize', detectCapabilities);
+
+    return () => {
+      window.removeEventListener('resize', detectCapabilities);
+    };
+  }, []);
+
+  // Handle wake lock for mobile when playing
+  useEffect(() => {
+    if (typeof window === "undefined" || !deviceCapabilities) return;
+
+    let wakeLock: WakeLockSentinel | null = null;
+
+    const requestWakeLock = async () => {
+      try {
+        if (deviceCapabilities?.supportsWakeLock) {
+          wakeLock = await navigator.wakeLock.request('screen');
+          wakeLock.addEventListener('release', () => {
+            console.log('Wake Lock was released');
+            wakeLock = null;
+          });
+        }
+      } catch (err) {
+        console.error(`${err.name}, ${err.message}`);
+      }
+    };
+
+    const releaseWakeLock = async () => {
+      if (wakeLock) {
+        await wakeLock.release();
+        wakeLock = null;
+      }
+    };
+
+    // Request wake lock when playing on mobile, release when not playing
+    if (state === "playing" && deviceCapabilities?.isMobile) {
+      requestWakeLock();
+    } else {
+      releaseWakeLock();
+    }
+
+    // Also handle visibility changes
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        releaseWakeLock();
+      } else if (state === "playing" && deviceCapabilities?.isMobile) {
+        requestWakeLock();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      releaseWakeLock();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [state, deviceCapabilities]);
+
   const playing = state === "playing";
   const transitioning = state === "loading" || state === "recovering" || state === "switching_source";
   const recoverableError = state === "error" || state === "offline";
@@ -101,6 +224,23 @@ export function PlayerUI({ playback, title }: { playback: PlaybackPayload; title
     }
   }
 
+  async function togglePictureInPicture(): Promise<void> {
+    const video = videoRef.current;
+    if (!video) return;
+
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else if (video.requestPictureInPicture) {
+        await video.requestPictureInPicture();
+      } else {
+        setMessage("Picture-in-Picture is not available in this browser.");
+      }
+    } catch (error) {
+      setMessage(`Picture-in-Picture failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   return (
     <PlayerMidrollOverlay isPlaying={playing}>
     <div ref={shellRef} className="rifitv-player-shell overflow-hidden rounded-lg border border-white/10 bg-black" aria-label={`${title} player`}>
@@ -114,6 +254,19 @@ export function PlayerUI({ playback, title }: { playback: PlaybackPayload; title
           preload="none"
           aria-label={title}
         />
+        {/* Device capabilities debug info (remove in production) */}
+        {deviceCapabilities && (
+          <div className="absolute top-2 left-2 text-xs bg-black/50 text-white p-1 rounded">
+            {deviceCapabilities.isMobile && "Mobile "}
+            {deviceCapabilities.isTablet && "Tablet "}
+            {deviceCapabilities.isDesktop && "Desktop "}
+            {isLandscape && "Landscape "}
+            {!isLandscape && "Portrait "}
+            {deviceCapabilities.supportsPictureInPicture && "PiP "}
+            {deviceCapabilities.supportsWakeLock && "WakeLock "}
+            {deviceCapabilities.supportsFullscreen && "FS"}
+          </div>
+        )}
         {state !== "playing" ? (
           <div className="absolute inset-0 grid place-items-center bg-black/65 text-center" role="status" aria-live="polite">
             <div className="space-y-3 px-6">
@@ -189,6 +342,9 @@ export function PlayerUI({ playback, title }: { playback: PlaybackPayload; title
         <span className="min-w-0 flex-1 truncate px-1 text-xs text-neutral-400" aria-live="polite">{stateLabel(state)}</span>
         <IconButton label="Retry" disabled={transitioning} onClick={() => void engineRef.current?.retry()}>
           <RotateCcw className="h-5 w-5" />
+        </IconButton>
+        <IconButton label="Picture-in-Picture" onClick={() => void togglePictureInPicture()}>
+          <MonitorPlay className="h-5 w-5" />
         </IconButton>
         <IconButton label="Fullscreen" onClick={() => void enterFullscreen()}>
           <Maximize className="h-5 w-5" />
