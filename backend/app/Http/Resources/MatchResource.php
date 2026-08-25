@@ -16,6 +16,7 @@ class MatchResource extends JsonResource
     public function toArray(Request $request): array
     {
         $playbackWindow = app(PlaybackWindowService::class)->stateFor($this->resource);
+        $state = app(MatchStateService::class)->stateFor($this->resource);
 
         return [
             'id' => $this->id,
@@ -56,6 +57,7 @@ class MatchResource extends JsonResource
             'last_synced_at' => $this->last_synced_at?->toIso8601String(),
             'sync_status' => $this->sync_status,
             'manual_overrides' => $this->manual_overrides,
+            'state' => $state,
             'stream_available_from' => $playbackWindow['opens_at'],
             'stream_closes_at' => $playbackWindow['closes_at'],
             'channels_count' => $this->whenCounted('channels'),

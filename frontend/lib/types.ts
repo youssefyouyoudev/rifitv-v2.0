@@ -45,6 +45,21 @@ export type Channel = {
   sort_order: number;
 };
 
+export type MatchState = {
+  isLive: boolean;
+  isFinished: boolean;
+  isPostponed: boolean;
+  isCancelled: boolean;
+  playbackStatus: PlaybackAccessStatus;
+  isWatchable: boolean;
+  displayStatus: string;
+  title: string;
+  subtitle: string;
+  eventStatus: string;
+  countdownSeconds: number | null;
+  countdownLabel: string;
+};
+
 export type Match = {
   id: number;
   slug: string;
@@ -81,6 +96,7 @@ export type Match = {
   playback_window: PlaybackWindow;
   stream_available_from?: string | null;
   stream_closes_at?: string | null;
+  state?: MatchState;
   admin?: {
     verification_label: string;
     stream_summary: {
