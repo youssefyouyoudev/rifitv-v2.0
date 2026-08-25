@@ -42,4 +42,9 @@ return [
         'retries' => (int) env('FOOTBALL_PROVIDER_RETRIES', 2),
     ],
 
+    'api-football' => [
+        'base_url' => env('API_FOOTBALL_BASE_URL', 'https://v3.football.api-sports.io'),
+        'key' => env('API_FOOTBALL_KEY'),
+    ],
+
 ];
