@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
+import { Fragment } from "react";
+import { AdPlacement } from "@/components/AdPlacement";
 import { AppShell } from "@/components/AppShell";
 import { MatchCard } from "@/components/MatchCard";
 import { JsonLd } from "@/components/JsonLd";
 import { getCompetition } from "@/lib/api";
 import { groupMatchesByDate, sortMatches } from "@/lib/matches";
 import { absoluteUrl, SITE_NAME } from "@/lib/site";
-import type { Match } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -64,8 +65,11 @@ export default async function CompetitionPage({ params }: PageProps<"/competitio
           <h1 className="text-2xl font-bold text-[var(--foreground)]">{competition.name}</h1>
           <p className="mt-1 text-sm text-[var(--muted)]">Fixtures and results organized by match date.</p>
         </section>
+        <AdPlacement name="competition_top" eager />
         <CompetitionSchedule title="Upcoming" groups={upcomingGroups} />
+        <AdPlacement name="competition_between_sections" />
         <CompetitionSchedule title="Results" groups={resultGroups} />
+        <AdPlacement name="competition_bottom" />
       </div>
     </AppShell>
   );
@@ -79,7 +83,16 @@ function CompetitionSchedule({ title, groups }: { title: string; groups: ReturnT
         <div key={group.key} className="space-y-3">
           <h3 className="border-b border-[var(--border)] pb-2 text-sm font-semibold uppercase text-[var(--muted)]">{group.title}</h3>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {group.matches.map((match) => <MatchCard key={match.id} match={match} />)}
+            {group.matches.map((match, index) => (
+              <Fragment key={match.id}>
+                <MatchCard match={match} />
+                {(index + 1) % 5 === 0 ? (
+                  <div className="sm:col-span-2 xl:col-span-3">
+                    <AdPlacement name="competition_between_sections" />
+                  </div>
+                ) : null}
+              </Fragment>
+            ))}
           </div>
         </div>
       ))}

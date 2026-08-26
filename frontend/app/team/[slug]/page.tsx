@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AdPlacement } from "@/components/AdPlacement";
 import { AppShell } from "@/components/AppShell";
 import { MatchSection } from "@/components/MatchSection";
 import { JsonLd } from "@/components/JsonLd";
@@ -47,9 +48,10 @@ export default async function TeamPage({ params }: PageProps<"/team/[slug]">) {
             <p className="text-sm text-[var(--muted)]">{payload.team.country_code ?? "Featured club"}</p>
           </div>
         </section>
-        <MatchSection title="Live" matches={payload.live} />
-        <MatchSection title="Upcoming" matches={payload.upcoming} />
-        <MatchSection title="Recent Results" matches={payload.recent_results} />
+        <AdPlacement name="team_between_sections" />
+        <MatchSection title="Live" matches={payload.live} adPlacementName="team_between_sections" />
+        <MatchSection title="Upcoming" matches={payload.upcoming} adPlacementName="team_between_sections" />
+        <MatchSection title="Recent Results" matches={payload.recent_results} adPlacementName="team_between_sections" />
       </div>
     </AppShell>
   );

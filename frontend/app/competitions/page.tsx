@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AdPlacement } from "@/components/AdPlacement";
 import { AppShell } from "@/components/AppShell";
 import { CompetitionLogo } from "@/components/CompetitionLogo";
 import { getCompetitions, getHome, getMatches } from "@/lib/api";
@@ -36,6 +37,7 @@ export default async function CompetitionsPage() {
           <h1 className="text-2xl font-bold text-[var(--foreground)]">Competitions</h1>
           <p className="mt-1 text-sm text-[var(--muted)]">Today&apos;s fixtures and the next scheduled match in each competition.</p>
         </div>
+        <AdPlacement name="competition_top" eager />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {competitions.map((competition) => {
             const matches = todayMatches.filter((match) => match.competition.id === competition.id);
@@ -63,6 +65,7 @@ export default async function CompetitionsPage() {
             );
           })}
         </div>
+        <AdPlacement name="competition_bottom" />
       </section>
     </AppShell>
   );

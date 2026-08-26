@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Fragment } from "react";
 import { AdPlacement } from "@/components/AdPlacement";
 import { AppShell } from "@/components/AppShell";
 import { CompetitionLogo } from "@/components/CompetitionLogo";
@@ -88,6 +87,7 @@ export default async function MatchPage({ params }: PageProps<"/match/[slug]">) 
       </section>
       <div className="match-layout">
         <section className="space-y-4">
+          <AdPlacement name="match_above_player" eager />
           {canPlay ? (
             <PreWatchAdGate playback={playback} title={`${match.home_team.name} vs ${match.away_team.name}`} />
           ) : (
@@ -108,57 +108,49 @@ export default async function MatchPage({ params }: PageProps<"/match/[slug]">) 
 }
 
 async function MatchLinks({ match }: { match: Match }) {
-  // Fetch all matches to find related ones
-  // In a production app, this would be optimized with caching or API endpoints
+  let relatedMatches: Match[] = [];
+
   try {
     const allMatches = await getMatches();
-    const relatedMatches = findRelatedMatches(match, allMatches, 3);
-
-    if (relatedMatches.length === 0) {
-      // Fallback to default links if no related matches found
-      return (
-        <nav className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5" aria-label="Related match pages">
-          <h2 className="text-sm font-semibold uppercase tracking-normal text-[var(--muted)]">Related pages</h2>
-          <div className="mt-3 flex flex-wrap gap-2 text-sm font-semibold">
-            <Link href={`/team/${match.home_team.slug}`} className="rounded-md border border-[var(--border)] px-3 py-2 text-[var(--foreground)] hover:bg-[var(--surface-muted)]">{match.home_team.name}</Link>
-            <Link href={`/team/${match.away_team.slug}`} className="rounded-md border border-[var(--border)] px-3 py-2 text-[var(--foreground)] hover:bg-[var(--surface-muted)]">{match.away_team.name}</Link>
-            <Link href={`/competition/${match.competition.slug}`} className="rounded-md border border-[var(--border)] px-3 py-2 text-[var(--foreground)] hover:bg-[var(--surface-muted)]">More {match.competition.name}</Link>
-            <Link href="/matches/today" className="rounded-md border border-[var(--border)] px-3 py-2 text-[var(--foreground)] hover:bg-[var(--surface-muted)]">Today&apos;s matches</Link>
-          </div>
-        </nav>
-      );
-    }
-
-    return (
-      <nav className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5" aria-label="Related match pages">
-        <h2 className="text-sm font-semibold uppercase tracking-normal text-[var(--muted)]">Related matches</h2>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {relatedMatches.map((relatedMatch) => (
-            <Link
-              key={relatedMatch.id}
-              href={`/match/${relatedMatch.slug}`}
-              className="rounded-md border border-[var(--border)] px-3 py-2 text-[var(--foreground)] hover:bg-[var(--surface-muted)]"
-            >
-              {relatedMatch.home_team.name} vs {relatedMatch.away_team.name}
-            </Link>
-          ))}
-        </div>
-      </nav>
-    );
-  } catch (error) {
-    // Fallback to default links on error
-    return (
-      <nav className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5" aria-label="Related match pages">
-        <h2 className="text-sm font-semibold uppercase tracking-normal text-[var(--muted)]">Related pages</h2>
-        <div className="mt-3 flex flex-wrap gap-2 text-sm font-semibold">
-          <Link href={`/team/${match.home_team.slug}`} className="rounded-md border border-[var(--border)] px-3 py-2 text-[var(--foreground)] hover:bg-[var(--surface-muted)]">{match.home_team.name}</Link>
-          <Link href={`/team/${match.away_team.slug}`} className="rounded-md border border-[var(--border)] px-3 py-2 text-[var(--foreground)] hover:bg-[var(--surface-muted)]">{match.away_team.name}</Link>
-          <Link href={`/competition/${match.competition.slug}`} className="rounded-md border border-[var(--border)] px-3 py-2 text-[var(--foreground)] hover:bg-[var(--surface-muted)]">More {match.competition.name}</Link>
-          <Link href="/matches/today" className="rounded-md border border-[var(--border)] px-3 py-2 text-[var(--foreground)] hover:bg-[var(--surface-muted)]">Today&apos;s matches</Link>
-        </div>
-      </nav>
-    );
+    relatedMatches = findRelatedMatches(match, allMatches, 3);
+  } catch {
+    relatedMatches = [];
   }
+
+  if (relatedMatches.length === 0) {
+    return <DefaultMatchLinks match={match} />;
+  }
+
+  return (
+    <nav className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5" aria-label="Related match pages">
+      <h2 className="text-sm font-semibold uppercase tracking-normal text-[var(--muted)]">Related matches</h2>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {relatedMatches.map((relatedMatch) => (
+          <Link
+            key={relatedMatch.id}
+            href={`/match/${relatedMatch.slug}`}
+            className="rounded-md border border-[var(--border)] px-3 py-2 text-[var(--foreground)] hover:bg-[var(--surface-muted)]"
+          >
+            {relatedMatch.home_team.name} vs {relatedMatch.away_team.name}
+          </Link>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
+function DefaultMatchLinks({ match }: { match: Match }) {
+  return (
+    <nav className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5" aria-label="Related match pages">
+      <h2 className="text-sm font-semibold uppercase tracking-normal text-[var(--muted)]">Related pages</h2>
+      <div className="mt-3 flex flex-wrap gap-2 text-sm font-semibold">
+        <Link href={`/team/${match.home_team.slug}`} className="rounded-md border border-[var(--border)] px-3 py-2 text-[var(--foreground)] hover:bg-[var(--surface-muted)]">{match.home_team.name}</Link>
+        <Link href={`/team/${match.away_team.slug}`} className="rounded-md border border-[var(--border)] px-3 py-2 text-[var(--foreground)] hover:bg-[var(--surface-muted)]">{match.away_team.name}</Link>
+        <Link href={`/competition/${match.competition.slug}`} className="rounded-md border border-[var(--border)] px-3 py-2 text-[var(--foreground)] hover:bg-[var(--surface-muted)]">More {match.competition.name}</Link>
+        <Link href="/matches/today" className="rounded-md border border-[var(--border)] px-3 py-2 text-[var(--foreground)] hover:bg-[var(--surface-muted)]">Today&apos;s matches</Link>
+      </div>
+    </nav>
+  );
 }
 
 function PrematchPanel({ match, playback }: { match: Match; playback: PlaybackPayload }) {

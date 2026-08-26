@@ -51,6 +51,13 @@ describe("AdManager", () => {
     expect(manager.eligibleForAds("admin", "desktop", "aggressive")).toMatchObject({ allowed: false });
   });
 
+  it("keeps ordinary unknown routes out of the ad surface", async () => {
+    const manager = await loadManager();
+
+    expect(manager.eligibleForAds("other", "desktop", "normal")).toMatchObject({ allowed: false });
+    expect(manager.eligibleForAds("other", "desktop", "aggressive")).toMatchObject({ allowed: false });
+  });
+
   it("does not serve aggressive ads to TV devices", async () => {
     const manager = await loadManager();
     const result = await manager.requestAggressiveAd("match", "prewatch_transition", "tv");
@@ -109,5 +116,37 @@ describe("AdManager", () => {
     const manager = await import("./AdManager");
     const zone = manager.getBestBannerZone("desktop", ["hpf_728x90"]);
     expect(zone).toBeNull();
+  });
+
+  it("does not load banner inventory when banner ads are disabled", async () => {
+    vi.resetModules();
+    vi.stubEnv("NEXT_PUBLIC_RIFITV_ADS_ENABLED", "true");
+    vi.stubEnv("NEXT_PUBLIC_RIFITV_NORMAL_ADS_ENABLED", "true");
+    vi.stubEnv("NEXT_PUBLIC_RIFITV_BANNER_ADS_ENABLED", "false");
+
+    const manager = await import("./AdManager");
+
+    expect(manager.getBestBannerZone("desktop", ["hpf_728x90"])).toBeNull();
+    await expect(manager.loadPlacementAd("matches_top", "matches", "desktop")).resolves.toMatchObject({
+      loaded: false,
+      reason: "banner_disabled",
+    });
+    expect(document.querySelectorAll("script[data-rifitv-ad-zone]")).toHaveLength(0);
+  });
+
+  it("does not select direct-link zones when direct-link ads are disabled", async () => {
+    vi.resetModules();
+    vi.stubEnv("NEXT_PUBLIC_RIFITV_ADS_ENABLED", "true");
+    vi.stubEnv("NEXT_PUBLIC_RIFITV_AGGRESSIVE_ADS_ENABLED", "true");
+    vi.stubEnv("NEXT_PUBLIC_RIFITV_DIRECT_LINK_ADS_ENABLED", "false");
+
+    const manager = await import("./AdManager");
+    const openSpy = vi.spyOn(window, "open").mockReturnValue({} as Window);
+    const result = await manager.requestAggressiveAd("match", "watch_intent_click", "desktop", {
+      formats: ["direct-link"],
+    });
+
+    expect(result).toMatchObject({ loaded: false, reason: "no_aggressive_zone" });
+    expect(openSpy).not.toHaveBeenCalled();
   });
 });

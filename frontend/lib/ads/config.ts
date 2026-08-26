@@ -1,19 +1,49 @@
 export type AdDevice = "mobile" | "tablet" | "desktop" | "tv";
-export type AdRoute = "home" | "matches" | "match" | "live" | "admin" | "playerFullscreen" | "other";
-export type AdFormat = "display" | "banner" | "native" | "onclick" | "vignette" | "direct-link" | "unknown";
+export type AdRoute =
+  | "home"
+  | "matches"
+  | "match"
+  | "live"
+  | "competition"
+  | "search"
+  | "team"
+  | "admin"
+  | "playerFullscreen"
+  | "other";
+export type AdFormat =
+  | "display"
+  | "banner"
+  | "native"
+  | "onclick"
+  | "popunder"
+  | "vignette"
+  | "direct-link"
+  | "unknown";
 export type AdAggression = "normal" | "aggressive";
 
 export type AdPlacementName =
   | "homepage_between_sections"
+  | "matches_top"
   | "matches_in_feed"
+  | "matches_bottom"
+  | "competition_top"
+  | "competition_between_sections"
+  | "competition_bottom"
+  | "match_above_player"
   | "match_below_player"
   | "match_sidebar"
   | "match_sidebar_wide"
+  | "live_top"
+  | "live_feed"
   | "live_between_sections"
+  | "live_bottom"
   | "prewatch_transition"
   | "home_leaderboard"
   | "home_footer"
   | "feed_native"
+  | "search_top"
+  | "search_results"
+  | "team_between_sections"
   | "mobile_sticky"
   | "player_midroll";
 
@@ -63,6 +93,13 @@ export const AD_SETTINGS = {
   enabled: boolEnv("NEXT_PUBLIC_RIFITV_ADS_ENABLED", false),
   normalEnabled: boolEnv("NEXT_PUBLIC_RIFITV_NORMAL_ADS_ENABLED", true),
   aggressiveEnabled: boolEnv("NEXT_PUBLIC_RIFITV_AGGRESSIVE_ADS_ENABLED", false),
+  bannerEnabled: boolEnv("NEXT_PUBLIC_RIFITV_BANNER_ADS_ENABLED", true),
+  stickyEnabled: boolEnv("NEXT_PUBLIC_RIFITV_STICKY_ADS_ENABLED", true),
+  interstitialEnabled: boolEnv("NEXT_PUBLIC_RIFITV_INTERSTITIAL_ADS_ENABLED", true),
+  popunderEnabled: boolEnv("NEXT_PUBLIC_RIFITV_POPUNDER_ADS_ENABLED", true),
+  directLinkEnabled: boolEnv("NEXT_PUBLIC_RIFITV_DIRECT_LINK_ADS_ENABLED", true),
+  nativeEnabled: boolEnv("NEXT_PUBLIC_RIFITV_NATIVE_ADS_ENABLED", true),
+  playerAdsEnabled: boolEnv("NEXT_PUBLIC_RIFITV_PLAYER_ADS_ENABLED", true),
   mobileEnabled: boolEnv("NEXT_PUBLIC_RIFITV_MOBILE_ADS_ENABLED", true),
   tabletEnabled: boolEnv("NEXT_PUBLIC_RIFITV_TABLET_ADS_ENABLED", true),
   desktopEnabled: boolEnv("NEXT_PUBLIC_RIFITV_DESKTOP_ADS_ENABLED", true),
@@ -74,6 +111,8 @@ export const AD_SETTINGS = {
   directLinkCooldownMinutes: numEnv("NEXT_PUBLIC_RIFITV_DIRECT_LINK_COOLDOWN", 45),
   vignetteCooldownMinutes: numEnv("NEXT_PUBLIC_RIFITV_VIGNETTE_COOLDOWN", 45),
   popCooldownMinutes: numEnv("NEXT_PUBLIC_RIFITV_POP_COOLDOWN", 30),
+  interstitialCooldownMinutes: numEnv("NEXT_PUBLIC_RIFITV_INTERSTITIAL_COOLDOWN", 30),
+  pageViewsBeforeInterstitial: numEnv("NEXT_PUBLIC_RIFITV_PAGEVIEWS_BEFORE_INTERSTITIAL", 2),
   midrollIntervalMinutes: numEnv("NEXT_PUBLIC_RIFITV_MIDROLL_INTERVAL", 30),
   // Timeouts
   scriptTimeoutMs: numEnv("NEXT_PUBLIC_RIFITV_AD_SCRIPT_TIMEOUT_MS", 5000),
@@ -82,6 +121,7 @@ export const AD_SETTINGS = {
   prewatchSeconds: numEnv("NEXT_PUBLIC_RIFITV_PREWATCH_SECONDS", 10),
   mobileStickyAutoHideMs: numEnv("NEXT_PUBLIC_RIFITV_STICKY_AUTO_HIDE_MS", 30000),
   midrollDisplayMs: numEnv("NEXT_PUBLIC_RIFITV_MIDROLL_DISPLAY_MS", 18000),
+  debug: boolEnv("NEXT_PUBLIC_RIFITV_ADS_DEBUG", false),
 };
 
 // ---------------------------------------------------------------------------
@@ -274,6 +314,9 @@ export const AD_ROUTE_POLICY: Record<AdRoute, { normalAds: boolean; aggressiveAd
   matches: { normalAds: true, aggressiveAds: true },
   match: { normalAds: true, aggressiveAds: true },
   live: { normalAds: true, aggressiveAds: true },
+  competition: { normalAds: true, aggressiveAds: true },
+  search: { normalAds: true, aggressiveAds: false },
+  team: { normalAds: true, aggressiveAds: true },
   admin: { normalAds: false, aggressiveAds: false },
   playerFullscreen: { normalAds: false, aggressiveAds: false },
   other: { normalAds: false, aggressiveAds: false },
@@ -282,15 +325,27 @@ export const AD_ROUTE_POLICY: Record<AdRoute, { normalAds: boolean; aggressiveAd
 export const AD_PLACEMENT_ZONES: Record<AdPlacementName, string[]> = {
   // Note: zone11137952 appears here but AdManager dedup ensures it loads only once ever
   homepage_between_sections: ["zone11137945", "zone11137952"],
+  matches_top: ["zone11137945"],
   matches_in_feed: ["zone11137945"],
+  matches_bottom: ["zone11137945", "zone11137952"],
+  competition_top: ["zone11137945"],
+  competition_between_sections: ["zone11137945"],
+  competition_bottom: ["zone11137945", "zone11137952"],
+  match_above_player: ["zone11137945"],
   match_below_player: ["zone11137945", "zone11137952"],
   match_sidebar: ["zone11137945"],
   match_sidebar_wide: ["zone11137945"],
+  live_top: ["zone11137945"],
+  live_feed: ["zone11137945"],
   live_between_sections: ["zone11137945"],
+  live_bottom: ["zone11137945", "zone11137952"],
   prewatch_transition: ["zone11137945"],
   home_leaderboard: [],
   home_footer: [],
   feed_native: [],
+  search_top: [],
+  search_results: ["zone11137945"],
+  team_between_sections: ["zone11137945"],
   mobile_sticky: [],
   player_midroll: [],
 };

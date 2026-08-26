@@ -3,6 +3,7 @@
 import { Maximize, Pause, Play, RotateCcw, Volume2, VolumeX, MonitorPlay } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { API_BASE } from "@/lib/api";
+import { AD_SETTINGS } from "@/lib/ads/config";
 import { trackEvent } from "@/lib/analytics";
 import { PlayerMidrollOverlay } from "@/components/ads/PlayerMidrollOverlay";
 import type { PlaybackPayload, PlaybackSource } from "@/lib/types";
@@ -111,13 +112,13 @@ export function PlayerUI({ playback, title }: { playback: PlaybackPayload; title
 
       const supportsPictureInPicture = !!(
         document.pictureInPictureEnabled ||
-        (document as any).webkitCurrentFullScreenElement
+        (document as WebkitDocument).webkitCurrentFullScreenElement
       );
 
       const supportsWakeLock = 'wakeLock' in navigator;
       const supportsFullscreen = !!(
         document.documentElement.requestFullscreen ||
-        (document.documentElement as any).webkitRequestFullscreen
+        (document.documentElement as WebkitDocumentElement).webkitRequestFullscreen
       );
 
       setDeviceCapabilities({
@@ -255,8 +256,7 @@ export function PlayerUI({ playback, title }: { playback: PlaybackPayload; title
           preload="none"
           aria-label={title}
         />
-        {/* Device capabilities debug info (remove in production) */}
-        {deviceCapabilities && (
+        {AD_SETTINGS.debug && process.env.NODE_ENV !== "production" && deviceCapabilities ? (
           <div className="absolute top-2 left-2 text-xs bg-black/50 text-white p-1 rounded">
             {deviceCapabilities.isMobile && "Mobile "}
             {deviceCapabilities.isTablet && "Tablet "}
@@ -267,7 +267,7 @@ export function PlayerUI({ playback, title }: { playback: PlaybackPayload; title
             {deviceCapabilities.supportsWakeLock && "WakeLock "}
             {deviceCapabilities.supportsFullscreen && "FS"}
           </div>
-        )}
+        ) : null}
         {state !== "playing" ? (
           <div className="absolute inset-0 grid place-items-center bg-black/65 text-center" role="status" aria-live="polite">
             <div className="space-y-3 px-6">
@@ -358,6 +358,14 @@ export function PlayerUI({ playback, title }: { playback: PlaybackPayload; title
 
 type IOSVideoElement = HTMLVideoElement & {
   webkitEnterFullscreen?: () => void;
+};
+
+type WebkitDocumentElement = HTMLElement & {
+  webkitRequestFullscreen?: () => Promise<void>;
+};
+
+type WebkitDocument = Document & {
+  webkitCurrentFullScreenElement?: Element | null;
 };
 
 export async function reportPlaybackEvent(eventType: string, matchSlug: string, sourceId: number | null): Promise<void> {

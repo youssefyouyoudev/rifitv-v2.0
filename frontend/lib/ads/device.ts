@@ -27,5 +27,8 @@ export function routeForPath(pathname: string): AdRoute {
   if (pathname.startsWith("/matches")) return "matches";
   if (pathname.startsWith("/match/")) return "match";
   if (pathname.startsWith("/live")) return "live";
+  if (pathname.startsWith("/competition/") || pathname.startsWith("/competitions")) return "competition";
+  if (pathname.startsWith("/search")) return "search";
+  if (pathname.startsWith("/team/")) return "team";
   return "other";
 }

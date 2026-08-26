@@ -25,7 +25,7 @@ export function NativeAd({ className = "", eager = false }: Props) {
   const loadStarted = useRef(false);
   const containerId = NATIVE_AD.containerId;
   // Capture disabled state synchronously so we don't setState inside effect
-  const isDisabled = !AD_SETTINGS.enabled || !AD_SETTINGS.normalEnabled || !NATIVE_AD.enabled;
+  const isDisabled = !AD_SETTINGS.enabled || !AD_SETTINGS.normalEnabled || !AD_SETTINGS.nativeEnabled || !NATIVE_AD.enabled;
 
   useEffect(() => {
     // If ads are disabled, defer the state update out of the synchronous effect body
