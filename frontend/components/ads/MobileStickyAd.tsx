@@ -38,6 +38,7 @@ export function MobileStickyAd() {
     if (
       !AD_SETTINGS.enabled ||
       !AD_SETTINGS.normalEnabled ||
+      !AD_SETTINGS.stickyEnabled ||
       !AD_SETTINGS.mobileEnabled ||
       isBlockedPath
     ) {

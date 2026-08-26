@@ -41,8 +41,38 @@ const PLACEMENT_SIZE_MAP: Record<
     tablet: ["hpf_300x250"],
     mobile: ["hpf_320x50"],
   },
+  matches_top: {
+    desktop: ["hpf_728x90"],
+    tablet: ["hpf_300x250"],
+    mobile: ["hpf_320x50"],
+  },
   matches_in_feed: {
     desktop: ["hpf_728x90"],
+    tablet: ["hpf_300x250"],
+    mobile: ["hpf_320x50"],
+  },
+  matches_bottom: {
+    desktop: ["hpf_728x90", "hpf_468x60"],
+    tablet: ["hpf_300x250"],
+    mobile: ["hpf_320x50"],
+  },
+  competition_top: {
+    desktop: ["hpf_728x90"],
+    tablet: ["hpf_300x250"],
+    mobile: ["hpf_320x50"],
+  },
+  competition_between_sections: {
+    desktop: ["hpf_728x90", "hpf_300x250"],
+    tablet: ["hpf_300x250"],
+    mobile: ["hpf_320x50"],
+  },
+  competition_bottom: {
+    desktop: ["hpf_468x60", "hpf_300x250"],
+    tablet: ["hpf_300x250"],
+    mobile: ["hpf_320x50"],
+  },
+  match_above_player: {
+    desktop: ["hpf_728x90", "hpf_300x250"],
     tablet: ["hpf_300x250"],
     mobile: ["hpf_320x50"],
   },
@@ -61,8 +91,23 @@ const PLACEMENT_SIZE_MAP: Record<
     tablet: [],
     mobile: [],
   },
+  live_top: {
+    desktop: ["hpf_728x90"],
+    tablet: ["hpf_300x250"],
+    mobile: ["hpf_320x50"],
+  },
+  live_feed: {
+    desktop: ["hpf_728x90"],
+    tablet: ["hpf_300x250"],
+    mobile: ["hpf_320x50"],
+  },
   live_between_sections: {
     desktop: ["hpf_728x90", "hpf_468x60"],
+    tablet: ["hpf_300x250"],
+    mobile: ["hpf_320x50"],
+  },
+  live_bottom: {
+    desktop: ["hpf_468x60", "hpf_300x250"],
     tablet: ["hpf_300x250"],
     mobile: ["hpf_320x50"],
   },
@@ -72,6 +117,21 @@ const PLACEMENT_SIZE_MAP: Record<
     mobile: ["hpf_320x50"],
   },
   feed_native: { desktop: [], tablet: [], mobile: [] },
+  search_top: {
+    desktop: ["hpf_728x90"],
+    tablet: ["hpf_300x250"],
+    mobile: ["hpf_320x50"],
+  },
+  search_results: {
+    desktop: ["hpf_728x90", "hpf_300x250"],
+    tablet: ["hpf_300x250"],
+    mobile: ["hpf_320x50"],
+  },
+  team_between_sections: {
+    desktop: ["hpf_728x90", "hpf_300x250"],
+    tablet: ["hpf_300x250"],
+    mobile: ["hpf_320x50"],
+  },
   mobile_sticky: { desktop: [], tablet: [], mobile: ["hpf_320x50"] },
   player_midroll: {
     desktop: ["hpf_300x250"],

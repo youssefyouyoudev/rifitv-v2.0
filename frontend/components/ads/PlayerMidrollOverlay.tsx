@@ -44,6 +44,8 @@ function buildController(setters: OverlaySetters, autoCloseRef: { current: Retur
     if (!canShowMidrollOverlay()) return;
 
     const device = detectAdDevice();
+    if (device === "tv" || document.fullscreenElement) return;
+
     const zone = getBestBannerZone(device, [
       device === "mobile" ? "hpf_320x50" : "hpf_300x250",
       "hpf_300x250",
@@ -93,6 +95,7 @@ function buildController(setters: OverlaySetters, autoCloseRef: { current: Retur
 export function PlayerMidrollOverlay({ isPlaying, children }: Props) {
   const [overlayVisible, setOverlayVisible] = useState(false);
   const [overlayLoaded, setOverlayLoaded] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const watchTimeRef = useRef(0);
   const lastTickRef = useRef<number | null>(null);
@@ -118,9 +121,17 @@ export function PlayerMidrollOverlay({ isPlaying, children }: Props) {
     };
   }, []);
 
+  useEffect(() => {
+    const syncFullscreen = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    syncFullscreen();
+    document.addEventListener("fullscreenchange", syncFullscreen);
+
+    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
+  }, []);
+
   // Track watch time
   useEffect(() => {
-    if (!AD_SETTINGS.enabled || !AD_SETTINGS.normalEnabled) return;
+    if (!AD_SETTINGS.enabled || !AD_SETTINGS.normalEnabled || !AD_SETTINGS.playerAdsEnabled || isFullscreen) return;
 
     if (isPlaying) {
       lastTickRef.current = Date.now();
@@ -146,13 +157,13 @@ export function PlayerMidrollOverlay({ isPlaying, children }: Props) {
       const interval = tickIntervalRef.current;
       if (interval) clearInterval(interval);
     };
-  }, [isPlaying]);
+  }, [isPlaying, isFullscreen]);
 
   return (
     <div className="rifitv-player-midroll-wrapper" style={{ position: "relative" }}>
       {children}
-      {overlayLoaded && overlayVisible ? (
-        <div className="ad-midroll-overlay" aria-label="إعلان" role="complementary">
+      {overlayLoaded && overlayVisible && !isFullscreen ? (
+        <div className="ad-midroll-panel" aria-label="إعلان" role="complementary">
           <button
             type="button"
             className="ad-midroll-close"

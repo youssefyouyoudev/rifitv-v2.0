@@ -23,8 +23,9 @@ export default async function LivePage() {
           </div>
           <span className="text-sm text-[var(--muted)]">{home.date_label} - {home.timezone}</span>
         </section>
+        <AdPlacement name="live_top" eager />
 
-        {matches.length > 0 ? <MatchSection title="Live now" matches={matches} serverDate={home.date} /> : (
+        {matches.length > 0 ? <MatchSection title="Live now" matches={matches} serverDate={home.date} adPlacementName="live_feed" /> : (
           <section className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6">
             <h2 className="text-xl font-semibold text-[var(--foreground)]">Nothing live right now</h2>
             <p className="mt-2 text-sm text-[var(--muted)]">The next broadcast and today&apos;s schedule are ready below.</p>
@@ -41,7 +42,8 @@ export default async function LivePage() {
           </section>
         )}
         <AdPlacement name="live_between_sections" />
-        {remaining.length > 0 ? <MatchSection title="Later today" matches={remaining} serverDate={home.date} /> : null}
+        {remaining.length > 0 ? <MatchSection title="Later today" matches={remaining} serverDate={home.date} adPlacementName="live_feed" /> : null}
+        <AdPlacement name="live_bottom" />
       </div>
     </AppShell>
   );

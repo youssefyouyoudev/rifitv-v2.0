@@ -52,6 +52,7 @@ export default async function MatchesPage({ searchParams }: PageProps<"/matches"
             <p className="mt-1 text-sm text-[var(--muted)]">Full RiFiTV fixture schedule by date, kickoff time and competition</p>
           </div>
         </section>
+        <AdPlacement name="matches_top" eager />
         <form className="grid gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 md:grid-cols-[180px_1fr_160px_auto]">
           <input type="date" name="date" defaultValue={date ?? ""} className="h-10 rounded-md border border-[var(--border)] bg-[var(--background)] px-3 text-sm text-[var(--foreground)]" />
           <input type="search" name="search" defaultValue={search ?? ""} placeholder="Search team, competition or slug" className="h-10 rounded-md border border-[var(--border)] bg-[var(--background)] px-3 text-sm text-[var(--foreground)]" />
@@ -119,10 +120,11 @@ export default async function MatchesPage({ searchParams }: PageProps<"/matches"
                   </div>
                 ))}
               </div>
-            </section>
+          </section>
           ))}
           {groups.length === 0 ? <p className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6 text-sm text-[var(--muted)]">No matches found for this view.</p> : null}
         </div>
+        <AdPlacement name="matches_bottom" />
       </div>
     </AppShell>
   );

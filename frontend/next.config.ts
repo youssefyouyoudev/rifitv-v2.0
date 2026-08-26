@@ -58,7 +58,7 @@ const cspHeader = `
   style-src 'self' 'unsafe-inline';
   font-src 'self' data: https:;
   worker-src 'self' blob:;
-  frame-src 'self' https: ${adFrameSrc};
+  frame-src 'self' ${adFrameSrc};
   frame-ancestors 'none';
   object-src 'none';
   base-uri 'self';

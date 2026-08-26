@@ -6,6 +6,8 @@ const lastAggressiveKey = "rifitv:ads:last-aggressive-at";
 const lastDirectLinkKey = "rifitv:ads:last-direct-link-at";
 const lastVignetteKey = "rifitv:ads:last-vignette-at";
 const lastPopKey = "rifitv:ads:last-pop-at";
+const lastInterstitialKey = "rifitv:ads:last-interstitial-at";
+const pageViewsSinceInterstitialKey = "rifitv:ads:pageviews-since-interstitial";
 const prewatchShownKey = "rifitv:ads:prewatch-shown";
 const midrollLastShownKey = "rifitv:ads:last-midroll-at";
 const mobileStickyShownKey = "rifitv:ads:sticky-shown-this-view";
@@ -88,11 +90,45 @@ export function markAggressiveRequested(format: AdFormat, now = Date.now()): voi
 }
 
 // ---------------------------------------------------------------------------
+// Route interstitial opportunities
+// ---------------------------------------------------------------------------
+
+export function recordAdPageView(): number {
+  const nextCount = Number(readSessionValue(pageViewsSinceInterstitialKey) ?? 0) + 1;
+  writeSessionValue(pageViewsSinceInterstitialKey, String(nextCount));
+
+  return nextCount;
+}
+
+export function canShowInterstitialOpportunity(now = Date.now()): { allowed: boolean; reason?: string } {
+  if (!AD_SETTINGS.enabled) return { allowed: false, reason: "ads_disabled" };
+  if (!AD_SETTINGS.aggressiveEnabled) return { allowed: false, reason: "aggressive_disabled" };
+  if (!AD_SETTINGS.interstitialEnabled) return { allowed: false, reason: "interstitial_disabled" };
+
+  const pageViews = Number(readSessionValue(pageViewsSinceInterstitialKey) ?? 0);
+  if (pageViews < AD_SETTINGS.pageViewsBeforeInterstitial) {
+    return { allowed: false, reason: "pageview_cap" };
+  }
+
+  const lastInterstitialAt = Number(readLocalValue(lastInterstitialKey) ?? 0);
+  if (minutesSince(lastInterstitialAt, now) < AD_SETTINGS.interstitialCooldownMinutes) {
+    return { allowed: false, reason: "interstitial_cooldown" };
+  }
+
+  return canRequestAggressive("vignette", now);
+}
+
+export function markInterstitialShown(now = Date.now()): void {
+  writeLocalValue(lastInterstitialKey, String(now));
+  writeSessionValue(pageViewsSinceInterstitialKey, "0");
+}
+
+// ---------------------------------------------------------------------------
 // Mid-roll overlay (30-min viewing intervals)
 // ---------------------------------------------------------------------------
 
 export function canShowMidrollOverlay(now = Date.now()): boolean {
-  if (!AD_SETTINGS.enabled || !AD_SETTINGS.normalEnabled) return false;
+  if (!AD_SETTINGS.enabled || !AD_SETTINGS.normalEnabled || !AD_SETTINGS.playerAdsEnabled) return false;
   const lastAt = Number(readLocalValue(midrollLastShownKey) ?? 0);
   return minutesSince(lastAt, now) >= AD_SETTINGS.midrollIntervalMinutes;
 }
@@ -106,7 +142,7 @@ export function markMidrollShown(now = Date.now()): void {
 // ---------------------------------------------------------------------------
 
 export function canShowMobileSticky(): boolean {
-  if (!AD_SETTINGS.enabled || !AD_SETTINGS.normalEnabled) return false;
+  if (!AD_SETTINGS.enabled || !AD_SETTINGS.normalEnabled || !AD_SETTINGS.stickyEnabled) return false;
   return readSessionValue(mobileStickyShownKey) !== "true";
 }
 

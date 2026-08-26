@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AnalyticsPageView } from "@/components/AnalyticsPageView";
+import { AdExperienceController } from "@/components/ads/AdExperienceController";
 import { JsonLd } from "@/components/JsonLd";
 import { MobileStickyAd } from "@/components/ads/MobileStickyAd";
 import { RemoteNavigation } from "@/components/RemoteNavigation";
@@ -90,6 +91,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <JsonLd id="rifitv-organization" data={organizationJsonLd} />
         <JsonLd id="rifitv-website" data={websiteJsonLd} />
         <AnalyticsPageView />
+        <AdExperienceController />
         <RemoteNavigation />
         <ServiceWorkerRegistration />
         {children}

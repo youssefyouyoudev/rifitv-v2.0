@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { AdPlacement } from "@/components/AdPlacement";
 import { AppShell } from "@/components/AppShell";
 import { MatchSection } from "@/components/MatchSection";
 import { SearchForm } from "@/components/SearchForm";
@@ -28,6 +29,7 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
           <h1 className="text-2xl font-bold text-[var(--foreground)]">Search RiFiTV</h1>
           <p className="mt-2 text-sm text-[var(--muted)]">Find teams, matches and supported competitions.</p>
         </div>
+        <AdPlacement name="search_top" eager />
         <SearchForm query={query} />
         {query.length > 0 && query.length < 2 ? <p className="text-sm text-[var(--muted)]">Type at least two characters.</p> : null}
         {results ? (
@@ -40,6 +42,7 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
               ))}
             </ResultGroup>
             <MatchSection title="Matches" matches={results.matches} />
+            <AdPlacement name="search_results" />
             <ResultGroup title="Competitions">
               {results.competitions.map((competition) => (
                 <Link key={competition.id} href={`/competition/${competition.slug}`} className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-4 text-[var(--foreground)] outline-none hover:bg-[var(--surface-muted)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]">

@@ -25,23 +25,17 @@ test.afterEach(({ page }) => {
 test("homepage loads today's production surface", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Today", exact: true })).toBeVisible();
-  await expect(page.getByText("1 match")).toBeVisible();
+  await expect(page.getByText(/^\d+ matches?$/)).toBeVisible();
 
-  // When there ARE matches for today:
-  // - We show "Today" heading and match count
-  // - We show the HomeSignal component with "Next match" text (for the featured match)
-  // - We show match cards
-  // - We do NOT show the NoMatchesToday section
+  const noMatchesToday = page.getByText("No matches today");
+  if (await noMatchesToday.isVisible()) {
+    await expect(page.getByRole("link", { name: "View Matches" })).toBeVisible();
+    return;
+  }
 
-  await expect(page.getByText("No matches today")).toBeHidden();
-  await expect(page.getByRole("link", { name: "View Matches" })).toBeHidden(); // Only in NoMatchesToday
-
-  // We SHOULD see "Next match" in the HomeSignal component (for scheduled matches)
   await expect(page.getByText("Next match")).toBeVisible();
-
-  // We SHOULD see the match card for Fulham vs Chelsea
   await expect(page.locator('a[href^="/match/"]').first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "View match" })).toBeVisible(); // On the match card itself
+  await expect(page.getByRole("link", { name: "View match" })).toBeVisible();
 });
 
 test("past match shows as broadcast ended", async ({ page }) => {

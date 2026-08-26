@@ -31,6 +31,9 @@ const loadedZones = new Set<string>();
 
 export type AdLoadResult = { loaded: boolean; zone?: AdZone; reason?: string };
 export type BannerAdResult = { loaded: boolean; zone?: BannerZone; reason?: string };
+type AggressiveRequestOptions = {
+  formats?: AdZone["format"][];
+};
 
 export function resetAdManagerForTests(): void {
   loadedZones.clear();
@@ -75,6 +78,10 @@ export async function loadPlacementAd(
   route: AdRoute,
   device = detectAdDevice(),
 ): Promise<AdLoadResult> {
+  if (!AD_SETTINGS.bannerEnabled) {
+    return { loaded: false, reason: "banner_disabled" };
+  }
+
   const allowed = eligibleForAds(route, device, "normal");
   if (!allowed.allowed) {
     trackEvent("ad_blocked", { ad_placement: placement, reason: allowed.reason ?? "blocked", device_category: device });
@@ -103,6 +110,7 @@ export async function requestAggressiveAd(
   route: AdRoute,
   reason: string,
   device = detectAdDevice(),
+  options: AggressiveRequestOptions = {},
 ): Promise<AdLoadResult> {
   const allowed = eligibleForAds(route, device, "aggressive");
   if (!allowed.allowed) {
@@ -110,7 +118,7 @@ export async function requestAggressiveAd(
     return { loaded: false, reason: allowed.reason };
   }
 
-  const zone = chooseZone(AGGRESSIVE_ROTATION, device, "aggressive");
+  const zone = chooseZone(AGGRESSIVE_ROTATION, device, "aggressive", options.formats);
   if (!zone) {
     return { loaded: false, reason: "no_aggressive_zone" };
   }
@@ -154,7 +162,13 @@ export async function requestAggressiveAd(
 // ---------------------------------------------------------------------------
 
 export function loadEcpmSupplementalScripts(): void {
-  if (!AD_SETTINGS.enabled || !AD_SETTINGS.normalEnabled) return;
+  if (
+    !AD_SETTINGS.enabled ||
+    !AD_SETTINGS.aggressiveEnabled ||
+    (!AD_SETTINGS.popunderEnabled && !AD_SETTINGS.interstitialEnabled && !AD_SETTINGS.directLinkEnabled)
+  ) {
+    return;
+  }
   if (typeof document === "undefined") return;
 
   for (const entry of Object.values(ECPM_SCRIPTS)) {
@@ -175,7 +189,7 @@ export function loadEcpmSupplementalScripts(): void {
 // ---------------------------------------------------------------------------
 
 export function loadNativeAd(targetContainerId: string): Promise<{ loaded: boolean; reason?: string }> {
-  if (!AD_SETTINGS.enabled || !AD_SETTINGS.normalEnabled || !NATIVE_AD.enabled) {
+  if (!AD_SETTINGS.enabled || !AD_SETTINGS.normalEnabled || !AD_SETTINGS.nativeEnabled || !NATIVE_AD.enabled) {
     return Promise.resolve({ loaded: false, reason: "disabled" });
   }
   if (typeof document === "undefined") {
@@ -233,7 +247,7 @@ export function loadNativeAd(targetContainerId: string): Promise<{ loaded: boole
 // ---------------------------------------------------------------------------
 
 export function getBestBannerZone(device: AdDevice, preferredSizes: string[]): BannerZone | null {
-  if (!AD_SETTINGS.enabled || !AD_SETTINGS.normalEnabled) return null;
+  if (!AD_SETTINGS.enabled || !AD_SETTINGS.normalEnabled || !AD_SETTINGS.bannerEnabled) return null;
 
   for (const key of preferredSizes) {
     const zone = HPF_BANNER_ZONES[key];
@@ -248,11 +262,18 @@ export function getBestBannerZone(device: AdDevice, preferredSizes: string[]): B
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-function chooseZone(keys: string[], device: AdDevice, aggression: AdAggression): AdZone | null {
+function chooseZone(
+  keys: string[],
+  device: AdDevice,
+  aggression: AdAggression,
+  allowedFormats?: AdZone["format"][],
+): AdZone | null {
   const candidates = keys
     .map((key) => AD_ZONES[key])
     .filter((zone): zone is AdZone => Boolean(zone))
     .filter((zone) => zone.enabled && zone.aggression === aggression)
+    .filter((zone) => !allowedFormats || allowedFormats.includes(zone.format))
+    .filter((zone) => formatEnabled(zone.format))
     .filter((zone) => !(device === "tv" && zone.disableOnTv));
 
   if (candidates.length === 0) {
@@ -270,6 +291,16 @@ function chooseZone(keys: string[], device: AdDevice, aggression: AdAggression):
   }
 
   return candidates[0] ?? null;
+}
+
+function formatEnabled(format: AdZone["format"]): boolean {
+  if (format === "banner" || format === "display") return AD_SETTINGS.bannerEnabled;
+  if (format === "native") return AD_SETTINGS.nativeEnabled;
+  if (format === "direct-link") return AD_SETTINGS.directLinkEnabled;
+  if (format === "onclick" || format === "popunder") return AD_SETTINGS.popunderEnabled;
+  if (format === "vignette") return AD_SETTINGS.interstitialEnabled;
+
+  return true;
 }
 
 function zoneRegistry(): Set<string> {

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Fragment } from "react";
+import { AdPlacement } from "./AdPlacement";
 import { AppShell } from "./AppShell";
 import { MatchCard } from "./MatchCard";
 import { JsonLd } from "./JsonLd";
@@ -65,17 +67,28 @@ export function FootballScheduleView({
             </Link>
           ))}
         </div>
+        <AdPlacement name="matches_top" />
         <div className="space-y-8">
           {groups.map((group) => (
             <section key={group.key} className="space-y-4">
               <h2 className="border-b border-[var(--border)] pb-2 text-xl font-semibold text-[var(--foreground)]">{group.title}</h2>
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {group.matches.map((match) => <MatchCard key={match.id} match={match} serverDate={serverDate} />)}
+                {group.matches.map((match, index) => (
+                  <Fragment key={match.id}>
+                    <MatchCard match={match} serverDate={serverDate} />
+                    {(index + 1) % 5 === 0 ? (
+                      <div className="sm:col-span-2 xl:col-span-3">
+                        <AdPlacement name="matches_in_feed" />
+                      </div>
+                    ) : null}
+                  </Fragment>
+                ))}
               </div>
             </section>
           ))}
           {groups.length === 0 ? <p className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6 text-sm text-[var(--muted)]">No matches scheduled for this date.</p> : null}
         </div>
+        <AdPlacement name="matches_bottom" />
       </div>
     </AppShell>
   );
